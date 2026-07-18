@@ -10,6 +10,7 @@ import com.omnisocials.errors.AuthenticationException;
 import com.omnisocials.errors.OmniSocialsException;
 import com.omnisocials.resources.AccountsResource;
 import com.omnisocials.resources.AnalyticsResource;
+import com.omnisocials.resources.AudioResource;
 import com.omnisocials.resources.FoldersResource;
 import com.omnisocials.resources.LocationsResource;
 import com.omnisocials.resources.MediaResource;
@@ -82,6 +83,7 @@ public final class OmniSocials {
   private final FoldersResource folders;
   private final AccountsResource accounts;
   private final AnalyticsResource analytics;
+  private final AudioResource audio;
   private final LocationsResource locations;
   private final WebhooksResource webhooks;
 
@@ -101,6 +103,7 @@ public final class OmniSocials {
     this.folders = new FoldersResource(this);
     this.accounts = new AccountsResource(this);
     this.analytics = new AnalyticsResource(this);
+    this.audio = new AudioResource(this);
     this.locations = new LocationsResource(this);
     this.webhooks = new WebhooksResource(this);
   }
@@ -135,6 +138,10 @@ public final class OmniSocials {
 
   public AnalyticsResource analytics() {
     return analytics;
+  }
+
+  public AudioResource audio() {
+    return audio;
   }
 
   public LocationsResource locations() {
