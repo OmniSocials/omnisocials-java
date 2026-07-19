@@ -12,6 +12,7 @@ import com.omnisocials.resources.AccountsResource;
 import com.omnisocials.resources.AnalyticsResource;
 import com.omnisocials.resources.AudioResource;
 import com.omnisocials.resources.FoldersResource;
+import com.omnisocials.resources.InboxResource;
 import com.omnisocials.resources.LocationsResource;
 import com.omnisocials.resources.MediaResource;
 import com.omnisocials.resources.PostsResource;
@@ -85,6 +86,7 @@ public final class OmniSocials {
   private final AnalyticsResource analytics;
   private final AudioResource audio;
   private final LocationsResource locations;
+  private final InboxResource inbox;
   private final WebhooksResource webhooks;
 
   private OmniSocials(Builder builder, String apiKey) {
@@ -105,6 +107,7 @@ public final class OmniSocials {
     this.analytics = new AnalyticsResource(this);
     this.audio = new AudioResource(this);
     this.locations = new LocationsResource(this);
+    this.inbox = new InboxResource(this);
     this.webhooks = new WebhooksResource(this);
   }
 
@@ -146,6 +149,10 @@ public final class OmniSocials {
 
   public LocationsResource locations() {
     return locations;
+  }
+
+  public InboxResource inbox() {
+    return inbox;
   }
 
   public WebhooksResource webhooks() {
