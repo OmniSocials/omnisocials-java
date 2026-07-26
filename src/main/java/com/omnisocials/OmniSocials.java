@@ -12,6 +12,7 @@ import com.omnisocials.resources.AccountsResource;
 import com.omnisocials.resources.AnalyticsResource;
 import com.omnisocials.resources.AudioResource;
 import com.omnisocials.resources.FoldersResource;
+import com.omnisocials.resources.HashtagSetsResource;
 import com.omnisocials.resources.InboxResource;
 import com.omnisocials.resources.LocationsResource;
 import com.omnisocials.resources.MediaResource;
@@ -63,7 +64,7 @@ import java.util.stream.Collectors;
 public final class OmniSocials {
 
   /** SDK version, also used in the User-Agent header. */
-  public static final String VERSION = "0.1.0";
+  public static final String VERSION = "0.2.0";
 
   public static final String DEFAULT_BASE_URL = "https://api.omnisocials.com/v1";
   public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
@@ -82,6 +83,7 @@ public final class OmniSocials {
   private final PostsResource posts;
   private final MediaResource media;
   private final FoldersResource folders;
+  private final HashtagSetsResource hashtagSets;
   private final AccountsResource accounts;
   private final AnalyticsResource analytics;
   private final AudioResource audio;
@@ -103,6 +105,7 @@ public final class OmniSocials {
     this.posts = new PostsResource(this);
     this.media = new MediaResource(this);
     this.folders = new FoldersResource(this);
+    this.hashtagSets = new HashtagSetsResource(this);
     this.accounts = new AccountsResource(this);
     this.analytics = new AnalyticsResource(this);
     this.audio = new AudioResource(this);
@@ -133,6 +136,10 @@ public final class OmniSocials {
 
   public FoldersResource folders() {
     return folders;
+  }
+
+  public HashtagSetsResource hashtagSets() {
+    return hashtagSets;
   }
 
   public AccountsResource accounts() {

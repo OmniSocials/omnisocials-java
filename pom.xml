@@ -6,7 +6,7 @@
 
   <groupId>com.omnisocials</groupId>
   <artifactId>omnisocials-java</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <packaging>jar</packaging>
 
   <name>OmniSocials Java SDK</name>

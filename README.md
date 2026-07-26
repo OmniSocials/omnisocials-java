@@ -15,14 +15,14 @@ Maven:
 <dependency>
   <groupId>com.omnisocials</groupId>
   <artifactId>omnisocials-java</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation "com.omnisocials:omnisocials-java:0.1.0"
+implementation "com.omnisocials:omnisocials-java:0.2.0"
 ```
 
 ## Quickstart
@@ -124,6 +124,21 @@ client.posts().create(Params.builder()
 client.posts().createAndPublish(Params.builder()
     .put("content", "Going live right now")
     .put("channels", List.of("x", "bluesky"))
+    .build());
+```
+
+### Per-media alt text
+
+Every `media_urls` / `media_ids` entry accepts either a plain string or a map with an `alt` accessibility description (max 1500 chars). Alt text is delivered to Mastodon (media description), Bluesky (embed alt), X (photos and GIFs), and Pinterest (pin alt text). Strings and maps can be mixed, and the same shape works in per-platform maps and `thread_parts` media.
+
+```java
+client.posts().create(Params.builder()
+    .put("content", "Sunrise over the harbor")
+    .put("channels", List.of("mastodon", "bluesky"))
+    .put("scheduled_at", "2026-08-01T09:00:00Z")
+    .put("media_urls", List.of(Params.of(
+        "url", "https://example.com/harbor.jpg",
+        "alt", "A small sailboat crossing a calm harbor at sunrise, sky in deep orange")))
     .build());
 ```
 
@@ -275,6 +290,37 @@ String folderId = folder.get("data").get("id").asText();
 
 client.folders().update(folderId, Params.of("name", "Campaigns 2026"));
 client.folders().delete(folderId); // files move to root, subfolders move up
+```
+
+## Hashtag Sets
+
+Save reusable hashtag groups and apply them to posts at create time. Uses the `posts:read` / `posts:write` scopes.
+
+```java
+JsonNode set = client.hashtagSets().create(Params.of(
+    "name", "Launch",
+    "hashtags", List.of("saas", "buildinpublic", "startup") // or one string: "#saas #buildinpublic #startup"
+));
+String setId = set.get("data").get("id").asText();
+System.out.println(set.get("data").get("preview").asText()); // "#saas #buildinpublic #startup"
+
+client.hashtagSets().list();
+client.hashtagSets().get(setId);
+client.hashtagSets().update(setId, Params.of("hashtags", List.of("saas", "founder"))); // replaces the full list
+client.hashtagSets().delete(setId); // returns null (204)
+```
+
+Apply a set when creating a post with `hashtag_set` (the set name, case-insensitive) or `hashtag_set_id`. The set is applied once at create time and tags already in the caption are skipped. `hashtag_placement` is `"caption_append"` (default) or `"first_comment"`, and `hashtag_platforms` restricts the hashtags to a subset of the post's channels. Instagram's 30-hashtag cap returns error code `hashtag_limit_exceeded`.
+
+```java
+client.posts().create(Params.builder()
+    .put("content", "Launch day!")
+    .put("channels", List.of("instagram", "x"))
+    .put("scheduled_at", "2026-08-01T09:00:00Z")
+    .put("hashtag_set", "Launch")
+    .put("hashtag_placement", "first_comment")
+    .put("hashtag_platforms", List.of("instagram"))
+    .build());
 ```
 
 ## Accounts

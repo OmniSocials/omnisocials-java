@@ -57,6 +57,14 @@ public final class PostsResource extends ApiResource {
    * {@code media_ids}, {@code location_id}, plus per-platform option maps
    * ({@code instagram}, {@code youtube}, {@code x} with {@code thread_parts},
    * {@code bluesky}, {@code mastodon}, ...).
+   *
+   * <p>Each {@code media_urls} / {@code media_ids} entry is a plain string, or
+   * a map with an {@code alt} accessibility description (max 1500 chars):
+   * {@code Map.of("url", "https://...", "alt", "...")} for media_urls,
+   * {@code Map.of("id", "...", "alt", "...")} for media_ids. Alt text is
+   * delivered to Mastodon (media description), Bluesky (embed alt), X
+   * (photos/GIFs), and Pinterest (pin alt text); the same entry shape works
+   * inside {@code thread_parts} media.
    */
   public JsonNode create(Map<String, Object> params) {
     return client.post("/posts/create", params);

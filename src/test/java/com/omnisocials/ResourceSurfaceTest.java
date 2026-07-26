@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.omnisocials.resources.AccountsResource;
 import com.omnisocials.resources.AnalyticsResource;
 import com.omnisocials.resources.FoldersResource;
+import com.omnisocials.resources.HashtagSetsResource;
 import com.omnisocials.resources.InboxResource;
 import com.omnisocials.resources.LocationsResource;
 import com.omnisocials.resources.MediaResource;
@@ -56,6 +57,12 @@ class ResourceSurfaceTest {
   }
 
   @Test
+  void hashtagSetsSurface() {
+    assertHasMethods(
+        HashtagSetsResource.class, "list", "get", "create", "update", "delete");
+  }
+
+  @Test
   void accountsSurface() {
     assertHasMethods(AccountsResource.class, "list", "get");
   }
@@ -89,6 +96,7 @@ class ResourceSurfaceTest {
     assertNotNull(client.posts());
     assertNotNull(client.media());
     assertNotNull(client.folders());
+    assertNotNull(client.hashtagSets());
     assertNotNull(client.accounts());
     assertNotNull(client.analytics());
     assertNotNull(client.locations());
