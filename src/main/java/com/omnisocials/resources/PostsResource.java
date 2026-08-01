@@ -63,8 +63,9 @@ public final class PostsResource extends ApiResource {
    * {@code Map.of("url", "https://...", "alt", "...")} for media_urls,
    * {@code Map.of("id", "...", "alt", "...")} for media_ids. Alt text is
    * delivered to Mastodon (media description), Bluesky (embed alt), X
-   * (photos/GIFs), and Pinterest (pin alt text); the same entry shape works
-   * inside {@code thread_parts} media.
+   * (photos/GIFs), Pinterest (pin alt text), Instagram (images), and
+   * LinkedIn (images); the same entry shape works inside
+   * {@code thread_parts} media.
    */
   public JsonNode create(Map<String, Object> params) {
     return client.post("/posts/create", params);

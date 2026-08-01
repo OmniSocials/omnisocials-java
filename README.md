@@ -129,7 +129,7 @@ client.posts().createAndPublish(Params.builder()
 
 ### Per-media alt text
 
-Every `media_urls` / `media_ids` entry accepts either a plain string or a map with an `alt` accessibility description (max 1500 chars). Alt text is delivered to Mastodon (media description), Bluesky (embed alt), X (photos and GIFs), and Pinterest (pin alt text). Strings and maps can be mixed, and the same shape works in per-platform maps and `thread_parts` media.
+Every `media_urls` / `media_ids` entry accepts either a plain string or a map with an `alt` accessibility description (max 1500 chars). Alt text is delivered to Mastodon (media description), Bluesky (embed alt), X (photos and GIFs), Pinterest (pin alt text), Instagram (images), and LinkedIn (images). Strings and maps can be mixed, and the same shape works in per-platform maps and `thread_parts` media.
 
 ```java
 client.posts().create(Params.builder()
@@ -192,7 +192,7 @@ client.posts().delete(id);   // returns null (204)
 
 ### Recent platform posts
 
-Fetch recent posts live from the connected platform APIs, including content published outside OmniSocials. Useful for brand-new workspaces where `list()` is empty. Requires the `analytics:read` scope.
+Fetch recent posts live from the connected platform APIs, including content published outside OmniSocials. Useful for brand-new workspaces where `list()` is empty. Requires the `analytics:read` scope. Each record includes `duration_seconds` (integer, nullable): the video length in whole seconds where the platform reports it — currently TikTok and YouTube; `null` for images and for platforms that don't expose it.
 
 ```java
 JsonNode recent = client.posts().recentPlatform(
