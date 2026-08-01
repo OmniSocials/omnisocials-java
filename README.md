@@ -175,7 +175,7 @@ client.posts().create(Params.builder()
 
 On update, pass an explicit `thread_parts` of `null` to clear thread mode (revert to a single post); omit it to leave the existing thread untouched. `Params.builder().put("thread_parts", null)` keeps the key and serializes it as JSON null.
 
-### List, get, update, publish, delete
+### List, get, update, publish, retry, delete
 
 ```java
 JsonNode page = client.posts().list(Params.of("status", "scheduled", "limit", 50));
@@ -184,8 +184,11 @@ String id = page.get("data").get(0).get("id").asText();
 client.posts().get(id);
 client.posts().update(id, Params.of("scheduled_at", "2026-08-02T10:00:00Z"));
 client.posts().publish(id);  // publish a draft/scheduled post now
+client.posts().retry(id);    // retry only the failed platforms of a failed/warning post
 client.posts().delete(id);   // returns null (204)
 ```
+
+`retry` re-publishes only the platforms that failed, on the same post; platforms that already succeeded are never posted again. It is asynchronous: a 200 means the retry is queued, so poll `get` for the outcome. Max 3 retries per platform.
 
 ### Recent platform posts
 

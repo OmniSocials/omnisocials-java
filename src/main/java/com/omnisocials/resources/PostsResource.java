@@ -93,4 +93,16 @@ public final class PostsResource extends ApiResource {
   public JsonNode publish(String id) {
     return client.post("/posts/" + seg(id) + "/publish");
   }
+
+  /**
+   * {@code POST /posts/:id/retry} - retry the failed platforms of a
+   * {@code failed} or {@code warning} (partially failed) post, on the same
+   * post. Only the platforms that failed are re-published; platforms that
+   * already succeeded are never posted again. Asynchronous: a 200 means the
+   * retry is queued - poll {@code get(id)} for the outcome. Max 3 retries per
+   * platform.
+   */
+  public JsonNode retry(String id) {
+    return client.post("/posts/" + seg(id) + "/retry");
+  }
 }
