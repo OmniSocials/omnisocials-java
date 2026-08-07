@@ -66,12 +66,22 @@ public final class PostsResource extends ApiResource {
    * (photos/GIFs), Pinterest (pin alt text), Instagram (images), and
    * LinkedIn (images); the same entry shape works inside
    * {@code thread_parts} media.
+   *
+   * <p>When the post targets X and its text (or any thread part) contains a
+   * URL, the response includes a top-level {@code warnings} array (sibling of
+   * {@code data}) with a {@code x_url_post_credits} entry carrying
+   * {@code credits_required} and {@code credits_balance}: X's link-post fee
+   * is passed through as prepaid credits, debited at publish time (from
+   * 2026-08-14). Credits are managed in the dashboard, not the API.
    */
   public JsonNode create(Map<String, Object> params) {
     return client.post("/posts/create", params);
   }
 
-  /** {@code POST /posts/create-and-publish} - create a post and publish it immediately. */
+  /**
+   * {@code POST /posts/create-and-publish} - create a post and publish it immediately.
+   * See {@link #create(Map)} for the {@code warnings} array on X link posts.
+   */
   public JsonNode createAndPublish(Map<String, Object> params) {
     return client.post("/posts/create-and-publish", params);
   }

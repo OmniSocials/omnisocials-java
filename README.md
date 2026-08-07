@@ -77,7 +77,7 @@ The API allows **100 requests per minute** per API key. When you exceed it, the 
 
 ## Return values and params
 
-Methods return the parsed response body as-is (Jackson `JsonNode`): single items come back as `{ "data": {...} }`, lists as `{ "data": [...], "pagination": {...} }`, and some responses carry extra sibling keys (media uploads include `compatibility`, PDF uploads include `slides` and `media_ids`). Endpoints that respond `204 No Content` (deletes) return `null`.
+Methods return the parsed response body as-is (Jackson `JsonNode`): single items come back as `{ "data": {...} }`, lists as `{ "data": [...], "pagination": {...} }`, and some responses carry extra sibling keys (media uploads include `compatibility`, PDF uploads include `slides` and `media_ids`, post creates targeting X with a URL in the text include `warnings`). Endpoints that respond `204 No Content` (deletes) return `null`.
 
 Request params are `Map<String, Object>`. Use the fluent `Params` helper, or any map you like:
 
@@ -174,6 +174,23 @@ client.posts().create(Params.builder()
 ```
 
 On update, pass an explicit `thread_parts` of `null` to clear thread mode (revert to a single post); omit it to leave the existing thread untouched. `Params.builder().put("thread_parts", null)` keeps the key and serializes it as JSON null.
+
+### X link posts use credits
+
+X bills API posts whose text contains a URL at a premium, and OmniSocials passes that fee through as prepaid credits (20 credits per URL-containing tweet; threads billed per part with a link). When a create targets X and the text contains a URL, the response carries a top-level `warnings` array (a sibling of `data`):
+
+```java
+JsonNode res = client.posts().create(Params.of(
+    "content", "Read the full story: https://example.com/post",
+    "channels", List.of("x")));
+for (JsonNode warning : res.path("warnings")) {
+  if ("x_url_post_credits".equals(warning.path("code").asText())) {
+    System.out.println(warning.path("credits_required").asInt());
+  }
+}
+```
+
+From `enforce_from` (2026-08-14) the balance is checked at publish time, but credits are only deducted after the post successfully publishes (a failed publish is never charged). If the balance can't cover it, only the X target fails (other platforms publish normally); top up in the dashboard under Settings -> Organisation -> Billing -> Credits, then call `posts().retry(id)`. Posts without links, analytics, and media on X stay free. There is no API endpoint for credits — they are managed in the dashboard.
 
 ### List, get, update, publish, retry, delete
 
