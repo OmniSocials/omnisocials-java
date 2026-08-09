@@ -73,6 +73,18 @@ public final class PostsResource extends ApiResource {
    * {@code credits_required} and {@code credits_balance}: X's link-post fee
    * is passed through as prepaid credits, debited at publish time (from
    * 2026-08-14). Credits are managed in the dashboard, not the API.
+   *
+   * <p>From 2026-08-14, scheduling an X link post can also be refused up
+   * front, before the request is accepted: every scheduled X link post
+   * reserves its cost, and if reserving this one would push the company's
+   * total reserved credits past its balance, this call throws an
+   * {@link com.omnisocials.errors.ApiException} with status 402 and code
+   * {@code x_credits_insufficient}, whose body carries
+   * {@code error.details.credits_required}, {@code credits_balance}, and
+   * {@code credits_reserved}. Drafts (no {@code scheduled_at}) are never
+   * gated, and posts scheduled to publish before 2026-08-14 are never gated.
+   * The same gate applies to {@link #update(String, Map)} and
+   * {@link #publish(String)}.
    */
   public JsonNode create(Map<String, Object> params) {
     return client.post("/posts/create", params);
@@ -80,7 +92,8 @@ public final class PostsResource extends ApiResource {
 
   /**
    * {@code POST /posts/create-and-publish} - create a post and publish it immediately.
-   * See {@link #create(Map)} for the {@code warnings} array on X link posts.
+   * See {@link #create(Map)} for the {@code warnings} array on X link posts
+   * and the X link-post credit gate (402 {@code x_credits_insufficient}).
    */
   public JsonNode createAndPublish(Map<String, Object> params) {
     return client.post("/posts/create-and-publish", params);
@@ -90,6 +103,10 @@ public final class PostsResource extends ApiResource {
    * {@code PATCH /posts/:id} - update a draft or scheduled post. Pass
    * {@code thread_parts: null} inside a platform options map to clear thread
    * mode; omit it to leave the existing thread untouched.
+   *
+   * <p>See {@link #create(Map)} for the X link-post credit gate (402
+   * {@code x_credits_insufficient}), which also applies here when the update
+   * (re)schedules an X post whose text contains a URL.
    */
   public JsonNode update(String id, Map<String, Object> params) {
     return client.patch("/posts/" + seg(id), params);
@@ -100,7 +117,12 @@ public final class PostsResource extends ApiResource {
     return client.delete("/posts/" + seg(id));
   }
 
-  /** {@code POST /posts/:id/publish} - publish a draft or scheduled post now. */
+  /**
+   * {@code POST /posts/:id/publish} - publish a draft or scheduled post now.
+   *
+   * <p>See {@link #create(Map)} for the X link-post credit gate (402
+   * {@code x_credits_insufficient}), which also applies here.
+   */
   public JsonNode publish(String id) {
     return client.post("/posts/" + seg(id) + "/publish");
   }

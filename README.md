@@ -192,6 +192,8 @@ for (JsonNode warning : res.path("warnings")) {
 
 From `enforce_from` (2026-08-14) the balance is checked at publish time, but credits are only deducted after the post successfully publishes (a failed publish is never charged). If the balance can't cover it, only the X target fails (other platforms publish normally); top up in the dashboard under Settings -> Organisation -> Billing -> Credits, then call `posts().retry(id)`. Posts without links, analytics, and media on X stay free. There is no API endpoint for credits — they are managed in the dashboard.
 
+From 2026-08-14, scheduling an X link post can also be refused up front, before the request is accepted: every scheduled X link post reserves its cost, and a `create`, `update`, or `publish` call that would push the company's total reserved credits past its balance throws an `ApiException` with status `402` and code `x_credits_insufficient`, whose body carries `error.details.credits_required`, `credits_balance`, and `credits_reserved`. Drafts are never gated, and posts scheduled to publish before 2026-08-14 are never gated either.
+
 ### List, get, update, publish, retry, delete
 
 ```java
@@ -399,6 +401,48 @@ if (check.get("valid").asBoolean()) {
       .build());
 }
 ```
+
+## Inbox
+
+Read and reply to the social inbox (DMs, comments, and mentions) across connected platforms. Uses the `inbox:read` / `inbox:write` scopes.
+
+```java
+JsonNode conversations = client.inbox().listConversations(
+    Params.of("platform", "instagram", "unread", true, "limit", 20));
+for (JsonNode conversation : conversations.get("data")) {
+  System.out.println(conversation.get("conversation_id").asText()
+      + " unread=" + conversation.get("unread_count").asInt());
+}
+
+String conversationId = conversations.get("data").get(0).get("conversation_id").asText();
+client.inbox().getMessages(conversationId, Params.of("limit", 50));
+client.inbox().markRead(conversationId);
+client.inbox().reply(conversationId, Params.of("text", "Thanks for reaching out!"));
+```
+
+Conversation and message lists use cursor pagination (`pagination.next_cursor` / `pagination.has_more`), not the offset pagination used elsewhere in this API. `platform` accepts `instagram`, `facebook`, `linkedin`, or `x`; a message's `direction` is `"incoming"` or `"outgoing"`.
+
+### X DM replies use credits
+
+X only supports the DM conversation type (no comments or mentions). Each X DM reply costs 2 prepaid credits, debited from the company balance before the message is sent and automatically refunded if the send fails:
+
+```java
+import com.omnisocials.errors.ApiException;
+
+try {
+  client.inbox().reply(conversationId, Params.of("text", "Thanks for the DM!"));
+} catch (ApiException e) {
+  if (e.getStatus() == 402 && "insufficient_credits".equals(e.getCode())) {
+    System.err.println("Not enough credits to send this reply; top up in the dashboard.");
+  } else if (e.getStatus() == 402 && "x_inbox_suspended".equals(e.getCode())) {
+    System.err.println("This workspace's X inbox is suspended at zero balance; top up and re-enable it.");
+  } else {
+    throw e;
+  }
+}
+```
+
+A workspace's X inbox is automatically suspended once its credit balance hits zero; DMs that arrive while suspended are not recovered, so top up and re-enable it in the dashboard (Settings -> Organisation -> Billing -> Credits) as soon as possible. Replies on Instagram, Facebook, and LinkedIn stay free.
 
 ## Webhooks
 
