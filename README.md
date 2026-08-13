@@ -420,7 +420,7 @@ client.inbox().markRead(conversationId);
 client.inbox().reply(conversationId, Params.of("text", "Thanks for reaching out!"));
 ```
 
-Conversation and message lists use cursor pagination (`pagination.next_cursor` / `pagination.has_more`), not the offset pagination used elsewhere in this API. `platform` accepts `instagram`, `facebook`, `linkedin`, or `x`; a message's `direction` is `"incoming"` or `"outgoing"`.
+Conversation and message lists use cursor pagination (`pagination.next_cursor` / `pagination.has_more`), not the offset pagination used elsewhere in this API. `platform` accepts `instagram`, `facebook`, `linkedin`, `tiktok`, or `x`; a message's `direction` is `"incoming"` or `"outgoing"`. TikTok replies are comments only and capped at 150 characters.
 
 ### X DM replies use credits
 
@@ -442,7 +442,7 @@ try {
 }
 ```
 
-A workspace's X inbox is automatically suspended once its credit balance hits zero; DMs that arrive while suspended are not recovered, so top up and re-enable it in the dashboard (Settings -> Organisation -> Billing -> Credits) as soon as possible. Replies on Instagram, Facebook, and LinkedIn stay free.
+A workspace's X inbox is automatically suspended once its credit balance hits zero; DMs that arrive while suspended are not recovered, so top up and re-enable it in the dashboard (Settings -> Organisation -> Billing -> Credits) as soon as possible. Replies on Instagram, Facebook, LinkedIn, and TikTok stay free.
 
 ## Webhooks
 
