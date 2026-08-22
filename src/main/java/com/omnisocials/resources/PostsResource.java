@@ -18,8 +18,9 @@ public final class PostsResource extends ApiResource {
 
   /**
    * {@code GET /posts?status=&limit=&offset=} - list posts with filters.
-   * Query params: {@code status} (draft | scheduled | published | failed),
-   * {@code limit}, {@code offset}.
+   * Query params: {@code status} (draft | in_approval | scheduled | posting |
+   * published | failed | warning; in_approval = waiting for a reviewer in an
+   * approval workflow), {@code limit}, {@code offset}.
    */
   public JsonNode list(Map<String, Object> query) {
     return client.get("/posts", query);
