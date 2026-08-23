@@ -17,7 +17,9 @@ import java.util.Map;
  *
  * <p>Unlike {@link Map#of}, {@code null} values are allowed and are serialized
  * as JSON {@code null} (some endpoints use explicit nulls, for example
- * {@code thread_parts: null} clears thread mode on a post update). Values can
+ * {@code thread_parts: null} inside the {@code x}, {@code bluesky},
+ * {@code mastodon} or {@code threads} options map clears thread mode on a
+ * post update). Values can
  * be strings, numbers, booleans, {@code List}s, or nested {@code Map}s.
  */
 public final class Params {

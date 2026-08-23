@@ -118,5 +118,14 @@ class ResourceSurfaceTest {
 
     var pairs = Params.of("platform", "instagram", "timezone", "Europe/Amsterdam");
     assertTrue(pairs.get("platform").equals("instagram"));
+
+    // Nested explicit null survives inside a platform options map: this is how
+    // an update clears a Threads chain (same for x / bluesky / mastodon).
+    var threadsClear = Params.builder().put("thread_parts", null).build();
+    var update = Params.builder().put("threads", threadsClear).build();
+    @SuppressWarnings("unchecked")
+    var threadsMap = (java.util.Map<String, Object>) update.get("threads");
+    assertTrue(threadsMap.containsKey("thread_parts"), "nested null thread_parts must be kept");
+    assertTrue(threadsMap.get("thread_parts") == null);
   }
 }

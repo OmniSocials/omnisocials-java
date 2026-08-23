@@ -57,7 +57,11 @@ public final class PostsResource extends ApiResource {
    * {@code scheduled_at} (ISO 8601; omit for a draft), {@code media_urls},
    * {@code media_ids}, {@code location_id}, plus per-platform option maps
    * ({@code instagram}, {@code youtube}, {@code x} with {@code thread_parts},
-   * {@code bluesky}, {@code mastodon}, ...).
+   * {@code bluesky}, {@code mastodon}, {@code threads}, ...). The same
+   * {@code thread_parts} shape (2 to 25 parts) publishes a chained thread on
+   * X, Bluesky, Mastodon and Threads. Threads: 500 characters per part, up to
+   * 10 media per part; parts after the first publish as replies to the
+   * previous part, and the Threads caption is taken from part 1.
    *
    * <p>Each {@code media_urls} / {@code media_ids} entry is a plain string, or
    * a map with an {@code alt} accessibility description (max 1500 chars):
@@ -102,7 +106,8 @@ public final class PostsResource extends ApiResource {
 
   /**
    * {@code PATCH /posts/:id} - update a draft or scheduled post. Pass
-   * {@code thread_parts: null} inside a platform options map to clear thread
+   * {@code thread_parts: null} inside a platform options map ({@code x},
+   * {@code bluesky}, {@code mastodon}, {@code threads}) to clear thread
    * mode; omit it to leave the existing thread untouched.
    *
    * <p>See {@link #create(Map)} for the X link-post credit gate (402
