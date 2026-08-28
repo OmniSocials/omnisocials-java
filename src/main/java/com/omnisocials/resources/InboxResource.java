@@ -6,7 +6,8 @@ import java.util.Map;
 
 /**
  * Social inbox: DMs, comments, and mentions across connected platforms
- * (Instagram, Facebook, LinkedIn, TikTok comments, and X DMs). Accessed via
+ * (Instagram, Facebook, LinkedIn, TikTok comments, YouTube comments, and X
+ * DMs). Accessed via
  * {@code client.inbox()}.
  *
  * <p>Unlike the offset-paginated list endpoints elsewhere in the API, the inbox
@@ -54,7 +55,7 @@ public final class InboxResource extends ApiResource {
    * {@code GET /inbox/conversations?platform=&type=&unread=&limit=&cursor=} -
    * list conversations with filters. Query params (all optional):
    * {@code platform} ({@code instagram} | {@code facebook} | {@code linkedin} |
-   * {@code tiktok} | {@code x}),
+   * {@code tiktok} | {@code youtube} | {@code x}),
    * {@code type} ({@code dm} | {@code comment} | {@code mention}),
    * {@code unread} (boolean), {@code limit} (1-100), {@code cursor} (an opaque
    * cursor from a previous response's {@code pagination.next_cursor}).
@@ -117,7 +118,8 @@ public final class InboxResource extends ApiResource {
    * auto-suspended after hitting a zero balance; top up and re-enable it in
    * the dashboard to resume - DMs that arrived while suspended are not
    * recovered). Replies on other platforms are free. TikTok replies are
-   * comments only, text-only, and capped at 150 characters.
+   * comments only, text-only, and capped at 150 characters. YouTube replies
+   * are comments only (YouTube has no DMs).
    *
    * <p>{@code conversationId} is URL-encoded for you.
    */
