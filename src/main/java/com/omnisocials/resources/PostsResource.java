@@ -63,6 +63,18 @@ public final class PostsResource extends ApiResource {
    * 10 media per part; parts after the first publish as replies to the
    * previous part, and the Threads caption is taken from part 1.
    *
+   * <p>Threads posts can carry a location tag: {@code location_id} inside the
+   * {@code threads} map (an id from {@code GET
+   * /locations/search?platform=threads}), or {@code location} ({@code { id,
+   * name?, address?, city?, country? }}) to store display fields along with
+   * the id; {@code location_id} wins when both are given. On a multi-post
+   * thread the tag is applied to part 1, and the Post's {@code threads} block
+   * echoes a {@code location} object when set. Threads location tagging is
+   * currently rolling out; until Meta approves the permissions it is disabled
+   * on production and create/update/publish return a 400 (also a 400
+   * {@code validation_error} asking you to reconnect Threads when the
+   * connection lacks the {@code threads_location_tagging} permission).
+   *
    * <p>Each {@code media_urls} / {@code media_ids} entry is a plain string, or
    * a map with an {@code alt} accessibility description (max 1500 chars):
    * {@code Map.of("url", "https://...", "alt", "...")} for media_urls,
@@ -108,7 +120,10 @@ public final class PostsResource extends ApiResource {
    * {@code PATCH /posts/:id} - update a draft or scheduled post. Pass
    * {@code thread_parts: null} inside a platform options map ({@code x},
    * {@code bluesky}, {@code mastodon}, {@code threads}) to clear thread
-   * mode; omit it to leave the existing thread untouched.
+   * mode; omit it to leave the existing thread untouched. A Threads location
+   * tag clears the same way: {@code location_id: null} (or
+   * {@code location: null}) inside {@code threads} removes the tag, while
+   * omitting the key leaves it untouched.
    *
    * <p>See {@link #create(Map)} for the X link-post credit gate (402
    * {@code x_credits_insufficient}), which also applies here when the update

@@ -189,6 +189,8 @@ client.posts().create(Params.builder()
 
 On update, pass an explicit `thread_parts` of `null` to clear thread mode (revert to a single post); omit it to leave the existing thread untouched. `Params.builder().put("thread_parts", null)` keeps the key and serializes it as JSON null. The same applies to `bluesky`, `mastodon` and `threads`.
 
+Threads posts can also carry a location tag: put `location_id` inside the `threads` map with an id from `client.locations().search(Params.of("platform", "threads", "q", "..."))` (see Locations below). On a multi-post thread the tag is applied to part 1, and on update an explicit `location_id` of `null` inside `threads` clears it. Threads location tagging is currently rolling out; until Meta approves the permissions it is disabled on production and calls return a clear error.
+
 ### X link posts use credits
 
 X bills API posts whose text contains a URL at a premium, and OmniSocials passes that fee through as prepaid credits (20 credits per URL-containing tweet; threads billed per part with a link). When a create targets X and the text contains a URL, the response carries a top-level `warnings` array (a sibling of `data`):
@@ -398,7 +400,7 @@ JsonNode best = client.analytics().bestTimes(
     Params.of("platform", "instagram", "timezone", "Europe/Amsterdam"));
 ```
 
-## Locations (Instagram place tagging)
+## Locations (Instagram and Threads place tagging)
 
 ```java
 JsonNode results = client.locations().search("Griffith Observatory");
@@ -416,6 +418,25 @@ if (check.get("valid").asBoolean()) {
 }
 ```
 
+Threads uses its own location ids (a Facebook Place ID is not a Threads location id). Pass `platform` = `threads` and search by keyword, or by `latitude` plus `longitude` instead of a keyword; use a result's `id` as `threads.location_id` on a post:
+
+```java
+JsonNode results = client.locations().search(
+    Params.of("platform", "threads", "q", "Griffith Observatory"));
+// or around a point instead of a keyword:
+JsonNode nearby = client.locations().search(
+    Params.of("platform", "threads", "latitude", 34.1184, "longitude", -118.3004));
+String threadsLocationId = results.get("locations").get(0).get("id").asText();
+
+client.posts().create(Params.builder()
+    .put("content", "Golden hour at the observatory")
+    .put("channels", List.of("threads"))
+    .put("threads", Params.of("location_id", threadsLocationId))
+    .build());
+```
+
+The Threads response is `{ locations: [...] }` (each with nullable `name`, `address`, `city`, `country`, `latitude`, `longitude`) or `{ error: { code, message } }` with `code` one of `not_available`, `threads_not_connected`, `threads_reauth_required` (reconnect Threads), or `platform_error`. Threads location tagging is currently rolling out; until Meta approves the permissions it is disabled on production and calls return a clear error.
+
 ## Inbox
 
 Read and reply to the social inbox (DMs, comments, and mentions) across connected platforms. Uses the `inbox:read` / `inbox:write` scopes.
@@ -432,9 +453,14 @@ String conversationId = conversations.get("data").get(0).get("conversation_id").
 client.inbox().getMessages(conversationId, Params.of("limit", 50));
 client.inbox().markRead(conversationId);
 client.inbox().reply(conversationId, Params.of("text", "Thanks for reaching out!"));
+
+// Threads only: hide or unhide a reply someone left on one of your Threads posts.
+String messageId = conversations.get("data").get(0).get("last_message").get("id").asText();
+client.inbox().hide(messageId);        // hide
+client.inbox().hide(messageId, false); // unhide
 ```
 
-Conversation and message lists use cursor pagination (`pagination.next_cursor` / `pagination.has_more`), not the offset pagination used elsewhere in this API. `platform` accepts `instagram`, `facebook`, `linkedin`, `tiktok`, `youtube`, or `x`; a message's `direction` is `"incoming"` or `"outgoing"`. TikTok and YouTube replies are comments only; TikTok replies are capped at 150 characters.
+Conversation and message lists use cursor pagination (`pagination.next_cursor` / `pagination.has_more`), not the offset pagination used elsewhere in this API. `platform` accepts `instagram`, `facebook`, `linkedin`, `tiktok`, `youtube`, `x`, or `threads`; a message's `direction` is `"incoming"` or `"outgoing"`. Threads conversations are comments (replies people leave on your Threads posts) and mentions; there are no Threads DMs. Only incoming top-level Threads replies can be hidden (nested replies cannot), and a hidden message keeps its place in the conversation with its `hidden` flag set. Threads inbox is currently rolling out; until Meta approves the permissions it is disabled on production and calls return a clear error, and it needs a Threads connection with the reply permission (a 401 `reauth_required` means reconnect Threads). TikTok and YouTube replies are comments only; TikTok replies are capped at 150 characters.
 
 ### X DM replies use credits
 

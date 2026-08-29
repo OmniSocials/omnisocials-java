@@ -81,7 +81,7 @@ class ResourceSurfaceTest {
   @Test
   void inboxSurface() {
     assertHasMethods(
-        InboxResource.class, "listConversations", "getMessages", "markRead", "reply");
+        InboxResource.class, "listConversations", "getMessages", "markRead", "reply", "hide");
   }
 
   @Test

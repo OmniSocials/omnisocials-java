@@ -6,9 +6,16 @@ import java.util.Map;
 
 /**
  * Social inbox: DMs, comments, and mentions across connected platforms
- * (Instagram, Facebook, LinkedIn, TikTok comments, YouTube comments, and X
- * DMs). Accessed via
- * {@code client.inbox()}.
+ * (Instagram, Facebook, LinkedIn, TikTok comments, YouTube comments, X DMs,
+ * and Threads comments and mentions). Accessed via {@code client.inbox()}.
+ *
+ * <p>Threads conversations are {@code type} {@code comment} (replies people
+ * leave on the user's Threads posts; conversation ids look like
+ * {@code threads_comment_<rootPostId>}) and {@code mention}
+ * ({@code threads_mention_<postId>}); there are no Threads DMs. Threads inbox
+ * is currently rolling out: until Meta approves the permissions it is
+ * disabled on production and calls return a clear error, and it needs a
+ * Threads connection with the reply permission.
  *
  * <p>Unlike the offset-paginated list endpoints elsewhere in the API, the inbox
  * list endpoints use <b>cursor pagination</b>. The {@code pagination} object is
@@ -29,7 +36,11 @@ import java.util.Map;
  *       {@code platform}, {@code type}, {@code direction}, {@code text},
  *       {@code timestamp}, {@code is_read}, {@code is_replied},
  *       {@code reaction}, {@code parent_comment_id}, {@code sender},
- *       {@code post}).
+ *       {@code post}, {@code hidden}, {@code permalink}). {@code hidden} is
+ *       Threads replies only: {@code true} when the reply is hidden on
+ *       Threads, JSON {@code null} for every other platform/message.
+ *       {@code permalink} links to the reply or mentioning post on the
+ *       platform, when known ({@code null} otherwise).
  *   <li><b>InboxParticipant</b> ({@code id}, {@code name}, {@code username},
  *       {@code profile_picture}) - the person on the other side of a
  *       conversation, or a message's {@code sender}.
@@ -55,7 +66,7 @@ public final class InboxResource extends ApiResource {
    * {@code GET /inbox/conversations?platform=&type=&unread=&limit=&cursor=} -
    * list conversations with filters. Query params (all optional):
    * {@code platform} ({@code instagram} | {@code facebook} | {@code linkedin} |
-   * {@code tiktok} | {@code youtube} | {@code x}),
+   * {@code tiktok} | {@code youtube} | {@code x} | {@code threads}),
    * {@code type} ({@code dm} | {@code comment} | {@code mention}),
    * {@code unread} (boolean), {@code limit} (1-100), {@code cursor} (an opaque
    * cursor from a previous response's {@code pagination.next_cursor}).
@@ -110,6 +121,12 @@ public final class InboxResource extends ApiResource {
    * {@code attachment_type} (optional; {@code image} | {@code video} |
    * {@code audio} | {@code file}, pair with {@code attachment_url}).
    *
+   * <p>On a Threads conversation the reply publishes as a native Threads
+   * reply. Threads inbox is currently rolling out (disabled on production
+   * until Meta App Review) and needs a Threads connection with the reply
+   * permission: a 401 with code {@code reauth_required} means the connection
+   * lacks that permission (reconnect Threads).
+   *
    * <p>X DM replies cost 2 prepaid credits per send, debited from the company
    * balance before the message is sent and automatically refunded if the send
    * fails. This can throw an {@link com.omnisocials.errors.ApiException} with
@@ -125,5 +142,38 @@ public final class InboxResource extends ApiResource {
    */
   public JsonNode reply(String conversationId, Map<String, Object> params) {
     return client.post("/inbox/conversations/" + seg(conversationId) + "/reply", params);
+  }
+
+  /**
+   * {@code POST /inbox/messages/:messageId/hide} - hide a reply someone left
+   * on one of the user's Threads posts, as the post owner (Threads only for
+   * now). Equivalent to {@link #hide(String, boolean)} with {@code hide} =
+   * {@code true}. Returns the updated message as {@code { data: InboxMessage
+   * }} with its {@code hidden} flag flipped.
+   *
+   * <p>Only incoming top-level replies can be hidden (Threads does not allow
+   * hiding nested replies); the message keeps its place in the conversation.
+   *
+   * <p>Errors: 400 {@code unsupported_platform} (not an incoming Threads
+   * reply, or Threads inbox not available yet), 400 {@code not_hideable}
+   * (nested reply or Threads refused), 401 {@code reauth_required} (the
+   * connection lacks the reply permission; reconnect Threads), 404
+   * {@code not_found} (message not in this workspace) or
+   * {@code account_not_connected} (no Threads account).
+   *
+   * <p>{@code messageId} is URL-encoded for you.
+   */
+  public JsonNode hide(String messageId) {
+    return client.post("/inbox/messages/" + seg(messageId) + "/hide");
+  }
+
+  /**
+   * {@code POST /inbox/messages/:messageId/hide} - hide ({@code hide} =
+   * {@code true}) or unhide ({@code hide} = {@code false}) a reply someone
+   * left on one of the user's Threads posts. See {@link #hide(String)} for
+   * the rules and error codes.
+   */
+  public JsonNode hide(String messageId, boolean hide) {
+    return client.post("/inbox/messages/" + seg(messageId) + "/hide", Map.of("hide", hide));
   }
 }
