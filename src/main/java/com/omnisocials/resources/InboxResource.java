@@ -116,10 +116,14 @@ public final class InboxResource extends ApiResource {
    * the conversation (a DM message, or a reply to the comment/mention). Returns
    * the created outbound message as {@code { data: InboxMessage }}.
    *
-   * <p>Params: {@code text} (string, required), {@code attachment_url}
-   * (optional public URL of a single media asset to attach),
-   * {@code attachment_type} (optional; {@code image} | {@code video} |
-   * {@code audio} | {@code file}, pair with {@code attachment_url}).
+   * <p>Params: {@code text} (string; optional when {@code attachment_url} is
+   * set - an attachment-only reply is allowed), {@code attachment_url}
+   * (optional public URL of a single media asset to attach, Facebook and
+   * Instagram DMs only), {@code attachment_type} (optional; {@code image} |
+   * {@code video} | {@code audio} | {@code file}, pair with
+   * {@code attachment_url}). Other platforms are text-only and require
+   * {@code text}. The returned message's {@code attachment} field carries
+   * the same shape when the message has media.
    *
    * <p>On a Threads conversation the reply publishes as a native Threads
    * reply. Threads inbox is currently rolling out (disabled on production

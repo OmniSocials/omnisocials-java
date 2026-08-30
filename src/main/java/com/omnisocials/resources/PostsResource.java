@@ -159,4 +159,40 @@ public final class PostsResource extends ApiResource {
   public JsonNode retry(String id) {
     return client.post("/posts/" + seg(id) + "/retry");
   }
+
+  /**
+   * {@code POST /posts/:id/approve} - approve the current step of a post's
+   * approval workflow, on behalf of the user who owns this API key. That
+   * user must be a listed approver for the workflow's CURRENT step - steps
+   * approve in order, so an approver on a later step gets a 403 {@code
+   * forbidden} error until earlier steps clear. Only works on a post with
+   * {@code approval_status: "pending"}. If this is the last step, the post
+   * finalizes immediately ({@code scheduled} or {@code posting});
+   * otherwise it stays {@code in_approval} and the next step's approvers
+   * are notified.
+   */
+  public JsonNode approve(String id) {
+    return client.post("/posts/" + seg(id) + "/approve");
+  }
+
+  /**
+   * {@code POST /posts/:id/reject} - reject a post's approval workflow, on
+   * behalf of the user who owns this API key. Same approver requirement as
+   * {@link #approve(String)}. Unlike approval, a rejection stops the WHOLE
+   * workflow immediately (not just the current step) - the post's status
+   * becomes {@code rejected}. {@code comment} is optional (pass null) and,
+   * when given, is shown to the requester and other approvers in the
+   * post's review thread.
+   */
+  public JsonNode reject(String id, String comment) {
+    if (comment == null) {
+      return client.post("/posts/" + seg(id) + "/reject");
+    }
+    return client.post("/posts/" + seg(id) + "/reject", java.util.Map.of("comment", comment));
+  }
+
+  /** {@code POST /posts/:id/reject} with no comment. See {@link #reject(String, String)}. */
+  public JsonNode reject(String id) {
+    return reject(id, null);
+  }
 }
