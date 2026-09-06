@@ -102,6 +102,15 @@ public final class PostsResource extends ApiResource {
    * gated, and posts scheduled to publish before 2026-08-14 are never gated.
    * The same gate applies to {@link #update(String, Map)} and
    * {@link #publish(String)}.
+   *
+   * <p>{@code approval_workflow_id} (a workflow id from
+   * {@link ApprovalWorkflowsResource#list()}) routes the post through a
+   * saved approval workflow: it is created as {@code in_approval}
+   * ({@code approval_status: "pending"}) instead of {@code scheduled}, the
+   * approvers are notified, and it publishes at {@code scheduled_at} once the
+   * last step approves. Requires {@code scheduled_at}; not allowed with
+   * {@code publish_now}. Errors: {@code 404 workflow_not_found},
+   * {@code 400 validation_error}.
    */
   public JsonNode create(Map<String, Object> params) {
     return client.post("/posts/create", params);

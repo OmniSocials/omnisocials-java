@@ -10,6 +10,7 @@ import com.omnisocials.errors.AuthenticationException;
 import com.omnisocials.errors.OmniSocialsException;
 import com.omnisocials.resources.AccountsResource;
 import com.omnisocials.resources.AnalyticsResource;
+import com.omnisocials.resources.ApprovalWorkflowsResource;
 import com.omnisocials.resources.AudioResource;
 import com.omnisocials.resources.FoldersResource;
 import com.omnisocials.resources.HashtagSetsResource;
@@ -84,6 +85,7 @@ public final class OmniSocials {
   private final MediaResource media;
   private final FoldersResource folders;
   private final HashtagSetsResource hashtagSets;
+  private final ApprovalWorkflowsResource approvalWorkflows;
   private final AccountsResource accounts;
   private final AnalyticsResource analytics;
   private final AudioResource audio;
@@ -106,6 +108,7 @@ public final class OmniSocials {
     this.media = new MediaResource(this);
     this.folders = new FoldersResource(this);
     this.hashtagSets = new HashtagSetsResource(this);
+    this.approvalWorkflows = new ApprovalWorkflowsResource(this);
     this.accounts = new AccountsResource(this);
     this.analytics = new AnalyticsResource(this);
     this.audio = new AudioResource(this);
@@ -140,6 +143,10 @@ public final class OmniSocials {
 
   public HashtagSetsResource hashtagSets() {
     return hashtagSets;
+  }
+
+  public ApprovalWorkflowsResource approvalWorkflows() {
+    return approvalWorkflows;
   }
 
   public AccountsResource accounts() {
