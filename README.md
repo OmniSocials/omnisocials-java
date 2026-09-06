@@ -463,13 +463,33 @@ client.inbox().getMessages(conversationId, Params.of("limit", 50));
 client.inbox().markRead(conversationId);
 client.inbox().reply(conversationId, Params.of("text", "Thanks for reaching out!"));
 
-// Threads only: hide or unhide a reply someone left on one of your Threads posts.
+// Hide or unhide a comment someone left on one of your posts (Facebook,
+// Instagram, TikTok, YouTube, Threads). Delete removes it outright (Facebook,
+// Instagram, TikTok; YouTube: hide instead), replies under it included.
 String messageId = conversations.get("data").get(0).get("last_message").get("id").asText();
 client.inbox().hide(messageId);        // hide
 client.inbox().hide(messageId, false); // unhide
+client.inbox().deleteMessage(messageId);
 ```
 
-Conversation and message lists use cursor pagination (`pagination.next_cursor` / `pagination.has_more`), not the offset pagination used elsewhere in this API. `platform` accepts `instagram`, `facebook`, `linkedin`, `tiktok`, `youtube`, `x`, or `threads`; a message's `direction` is `"incoming"` or `"outgoing"`. Threads conversations are comments (replies people leave on your Threads posts) and mentions; there are no Threads DMs. Only incoming top-level Threads replies can be hidden (nested replies cannot), and a hidden message keeps its place in the conversation with its `hidden` flag set. Threads inbox is currently rolling out; until Meta approves the permissions it is disabled on production and calls return a clear error, and it needs a Threads connection with the reply permission (a 401 `reauth_required` means reconnect Threads). TikTok and YouTube replies are comments only; TikTok replies are capped at 150 characters.
+Conversation and message lists use cursor pagination (`pagination.next_cursor` / `pagination.has_more`), not the offset pagination used elsewhere in this API. `platform` accepts `instagram`, `facebook`, `linkedin`, `tiktok`, `youtube`, `x`, or `threads`; a message's `direction` is `"incoming"` or `"outgoing"`. Threads conversations are comments (replies people leave on your Threads posts) and mentions; there are no Threads DMs. Comments can be hidden on Facebook, Instagram, TikTok, YouTube, and Threads (Threads: incoming top-level replies only), and a hidden message keeps its place in the conversation with its `hidden` flag set; `hidden` is `true`/`false` on comments and JSON `null` on DMs. A comment/mention's `post` carries `url` (public link when the platform provides one) and `media_type` (the platform's own label) next to `id`, `caption`, and `thumbnail`. Threads inbox is currently rolling out; until Meta approves the permissions it is disabled on production and calls return a clear error, and it needs a Threads connection with the reply permission (a 401 `reauth_required` means reconnect Threads). TikTok and YouTube replies are comments only; TikTok replies are capped at 150 characters.
+
+### Work queue: what needs an answer
+
+`next()` hands out the next conversation that still needs a reply (the customer's latest DM with no reply after it, or an unreplied comment/mention that is not hidden), with the whole thread and the post it belongs to, so a reply can be drafted from one call. Replies typed in the native apps count as answers. Only unread items are served by default, so `markRead` is the durable way to skip one; `exclude` skips conversation ids for the current session only. Pass `include_next` = `true` to `reply` to get the following item in the same response. `listConversations(Params.of("unanswered", true))` gives the same set as a plain list.
+
+```java
+JsonNode next = client.inbox().next(Params.of("platform", "instagram")).get("data");
+while (next != null && !next.isNull()) {
+  JsonNode message = next.get("message");
+  System.out.println(message.get("sender").get("username").asText() + ": " + message.get("text").asText());
+
+  JsonNode reply = client.inbox().reply(
+      message.get("conversation_id").asText(),
+      Params.of("text", "Thanks! DM sent.", "include_next", true));
+  next = reply.get("next"); // JSON null when nothing else is waiting; "remaining" sits beside it
+}
+```
 
 ### X DM replies use credits
 
