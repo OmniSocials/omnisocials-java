@@ -142,7 +142,7 @@ public final class PostsResource extends ApiResource {
     return client.patch("/posts/" + seg(id), params);
   }
 
-  /** {@code DELETE /posts/:id} - delete a post. Returns {@code null} (204). */
+  /** {@code DELETE /posts/:id} - remove a post from OmniSocials (the live post stays on the platform). Returns {@code null} (204). */
   public JsonNode delete(String id) {
     return client.delete("/posts/" + seg(id));
   }
