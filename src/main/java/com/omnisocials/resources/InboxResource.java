@@ -14,9 +14,8 @@ import java.util.Map;
  * leave on the user's Threads posts; conversation ids look like
  * {@code threads_comment_<rootPostId>}) and {@code mention}
  * ({@code threads_mention_<postId>}); there are no Threads DMs. Threads inbox
- * is currently rolling out: until Meta approves the permissions it is
- * disabled on production and calls return a clear error, and it needs a
- * Threads connection with the reply permission.
+ * needs a Threads connection with the reply permissions; connections made
+ * before those permissions existed must be reconnected once.
  *
  * <p>Unlike the offset-paginated list endpoints elsewhere in the API, the inbox
  * list endpoints use <b>cursor pagination</b>. The {@code pagination} object is
@@ -143,10 +142,9 @@ public final class InboxResource extends ApiResource {
    * the same shape when the message has media.
    *
    * <p>On a Threads conversation the reply publishes as a native Threads
-   * reply. Threads inbox is currently rolling out (disabled on production
-   * until Meta App Review) and needs a Threads connection with the reply
+   * reply. The Threads inbox needs a Threads connection with the reply
    * permission: a 401 with code {@code reauth_required} means the connection
-   * lacks that permission (reconnect Threads).
+   * lacks that permission (connected before it existed; reconnect Threads).
    *
    * <p>X DM replies cost 2 prepaid credits per send, debited from the company
    * balance before the message is sent and automatically refunded if the send
@@ -199,8 +197,9 @@ public final class InboxResource extends ApiResource {
    * {@code account_not_connected}, 429 {@code quota_exceeded} (YouTube's
    * daily API quota is used up; retry after midnight Pacific), 502
    * {@code platform_error} (the platform rejected the call). Threads inbox
-   * is currently rolling out; until Meta approves the permissions it is
-   * disabled on production and Threads calls return a clear error.
+   * needs a Threads connection with the reply permissions; a connection made
+   * before those permissions existed answers 401 {@code reauth_required}
+   * until reconnected.
    *
    * <p>{@code messageId} is URL-encoded for you.
    */
