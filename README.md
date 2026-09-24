@@ -476,7 +476,7 @@ Conversation and message lists use cursor pagination (`pagination.next_cursor` /
 
 ### Work queue: what needs an answer
 
-`next()` hands out the next conversation that still needs a reply (the customer's latest DM with no reply after it, or an unreplied comment/mention that is not hidden), with the whole thread and the post it belongs to, so a reply can be drafted from one call. Replies typed in the native apps count as answers. Only unread items are served by default, so `markRead` is the durable way to skip one; `exclude` skips conversation ids for the current session only. Pass `include_next` = `true` to `reply` to get the following item in the same response. `listConversations(Params.of("unanswered", true))` gives the same set as a plain list.
+`next()` hands out the next conversation that still needs a reply (the customer's latest DM with no reply after it, or an unreplied comment/mention that is not hidden), with the whole thread and the post it belongs to, so a reply can be drafted from one call. DMs that can still be answered come first, then Instagram/Facebook DMs whose 24-hour window has closed (`reply_window.open` is `false`: answer those from the native app or mark them read), then comments and mentions, oldest first. Replies typed in the native apps count as answers. Only unread items are served by default, so `markRead` is the durable way to skip one; `exclude` skips conversation ids for the current session only. Always pass `message_id` (the served `message.id`) to `reply` on comment threads: every comment on a post shares one conversation, and without it the reply goes under the newest comment on the post. Pass `include_next` = `true` to `reply` to get the following item in the same response. `listConversations(Params.of("unanswered", true))` gives the same set as a plain list.
 
 ```java
 JsonNode next = client.inbox().next(Params.of("platform", "instagram")).get("data");
@@ -484,9 +484,20 @@ while (next != null && !next.isNull()) {
   JsonNode message = next.get("message");
   System.out.println(message.get("sender").get("username").asText() + ": " + message.get("text").asText());
 
+  if (!next.get("reply_window").get("open").asBoolean()) {
+    // An Instagram/Facebook DM past Meta's 24-hour window: reply would throw
+    // 422 outside_messaging_window. Answer it in the app, or skip it.
+    client.inbox().markRead(message.get("conversation_id").asText());
+    next = client.inbox().next(Params.of("platform", "instagram")).get("data");
+    continue;
+  }
+
   JsonNode reply = client.inbox().reply(
       message.get("conversation_id").asText(),
-      Params.of("text", "Thanks! DM sent.", "include_next", true));
+      Params.of(
+          "text", "Thanks! DM sent.",
+          "message_id", message.get("id").asText(), // the comment being answered, not the newest one
+          "include_next", true));
   next = reply.get("next"); // JSON null when nothing else is waiting; "remaining" sits beside it
 }
 ```

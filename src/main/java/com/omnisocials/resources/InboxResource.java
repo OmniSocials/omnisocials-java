@@ -53,9 +53,16 @@ import java.util.Map;
  *       {@code CAROUSEL_ALBUM} on Instagram) when known; both {@code null}
  *       otherwise.
  *   <li><b>InboxNextUnanswered</b> ({@code conversation}, {@code message},
- *       {@code messages}) - what {@link #next(Map)} returns under
- *       {@code data} (JSON {@code null} when nothing is waiting), with
- *       {@code remaining} beside it.
+ *       {@code messages}, {@code reply_window}) - what {@link #next(Map)}
+ *       returns under {@code data} (JSON {@code null} when nothing is
+ *       waiting), with {@code remaining} beside it. {@code reply_window} is
+ *       {@code { open: boolean, closes_at: String|null }}: {@code open} is
+ *       {@code false} only for an Instagram/Facebook DM past Meta's 24-hour
+ *       messaging window (still served because the customer is waiting, but
+ *       {@link #reply(String, Map)} answers 422
+ *       {@code outside_messaging_window}; answer it from the native app or
+ *       mark the conversation read); every other item has {@code open}
+ *       {@code true} and {@code closes_at} {@code null}.
  * </ul>
  */
 public final class InboxResource extends ApiResource {
@@ -80,10 +87,11 @@ public final class InboxResource extends ApiResource {
    * {@code type} ({@code dm} | {@code comment} | {@code mention}),
    * {@code unread} (boolean), {@code unanswered} (boolean: only conversations
    * that still need an answer - the customer's latest DM has no reply after
-   * it, for Instagram/Facebook DMs within the 24-hour messaging window only,
-   * or a comment/mention that has not been replied to and is not hidden;
-   * replies typed in the native apps count as answers, and read state is
-   * ignored, so use {@link #next(Map)} for a work queue), {@code limit}
+   * it, Instagram/Facebook DMs past Meta's 24-hour messaging window included
+   * (they cannot be answered through the API, but the customer is still
+   * waiting), or a comment/mention that has not been replied to and is not
+   * hidden; replies typed in the native apps count as answers, and read
+   * state is ignored, so use {@link #next(Map)} for a work queue), {@code limit}
    * (1-100), {@code cursor} (an opaque cursor from a previous response's
    * {@code pagination.next_cursor}).
    */
@@ -157,6 +165,23 @@ public final class InboxResource extends ApiResource {
    * comments only, text-only, and capped at 150 characters. YouTube replies
    * are comments only (YouTube has no DMs).
    *
+   * <p>On comment and mention threads, pass {@code message_id} (the
+   * {@code id} of the comment being answered: {@code message.id} from
+   * {@link #next(Map)}, or a message {@code id} from
+   * {@link #getMessages(String)}). Every comment on a post shares one
+   * conversation, so without it the reply is posted under the newest comment
+   * on the post, which may be a different person than the one you drafted
+   * for. Ignored for DMs. 404 {@code not_found} when it is not an incoming
+   * message of this conversation.
+   *
+   * <p>Instagram and Facebook DMs can only be answered within 24 hours of
+   * the customer's last message (Meta policy). That is checked before the
+   * send: a closed window throws a 422 with code
+   * {@code outside_messaging_window} and nothing is sent ({@link #next(Map)}
+   * reports the same in {@code reply_window}). Answer such a DM from the
+   * Instagram or Facebook app (mirrored into the inbox) or mark the
+   * conversation read; do not retry.
+   *
    * <p>Pass {@code include_next} = {@code true} to also get {@code next} (the
    * next conversation that needs an answer, the same object
    * {@link #next(Map)} returns under {@code data}, using its default queue
@@ -196,10 +221,16 @@ public final class InboxResource extends ApiResource {
    * {@code not_found} (message not in this workspace) or
    * {@code account_not_connected}, 429 {@code quota_exceeded} (YouTube's
    * daily API quota is used up; retry after midnight Pacific), 502
-   * {@code platform_error} (the platform rejected the call). Threads inbox
-   * needs a Threads connection with the reply permissions; a connection made
-   * before those permissions existed answers 401 {@code reauth_required}
-   * until reconnected.
+   * {@code platform_error} (the platform rejected the call), 502
+   * {@code hide_not_applied} (Instagram accepted the call but, read back,
+   * still reports the comment in its old state; this happens with comments
+   * Instagram shows under "Comments from Facebook" on a reel that is also
+   * shared to Facebook, which live on Facebook where Instagram's hide does
+   * not reach them; the inbox row is left unchanged, so hide it in the
+   * Instagram or Facebook app and do not retry). Threads inbox needs a
+   * Threads connection with the reply permissions; a connection made before
+   * those permissions existed answers 401 {@code reauth_required} until
+   * reconnected.
    *
    * <p>{@code messageId} is URL-encoded for you.
    */
@@ -245,8 +276,9 @@ public final class InboxResource extends ApiResource {
 
   /**
    * {@code GET /inbox/next} - the next conversation that needs an answer,
-   * using the default queue: the oldest unread item across all platforms and
-   * types. See {@link #next(Map)}.
+   * using the default queue across all platforms and types: answerable DMs
+   * first, then Instagram/Facebook DMs past their 24-hour window, then
+   * comments and mentions, oldest first. See {@link #next(Map)}.
    */
   public JsonNode next() {
     return client.get("/inbox/next");
@@ -255,13 +287,18 @@ public final class InboxResource extends ApiResource {
   /**
    * {@code GET /inbox/next?platform=&type=&order=&include_read=&exclude=} -
    * the next conversation that needs an answer: a work queue for answering
-   * the inbox. Returns the oldest (by default) item that still needs a reply,
-   * together with its conversation so far and the post it belongs to, so a
-   * reply can be drafted from one call. An item needs an answer when it is
-   * the customer's latest DM with no reply after it (Instagram/Facebook DMs
-   * within the 24-hour messaging window only, since Meta refuses replies
-   * outside it), or a comment/mention that has not been replied to and is
-   * not hidden. Replies typed in the native apps count as answers (they are
+   * the inbox. Returns one item that still needs a reply, together with its
+   * conversation so far and the post it belongs to, so a reply can be
+   * drafted from one call. An item needs an answer when it is the
+   * customer's latest DM with no reply after it, or a comment/mention that
+   * has not been replied to and is not hidden. Order: DMs that can still be
+   * answered come first (Instagram/Facebook DMs inside Meta's 24-hour
+   * window, the one whose window closes soonest first, and X DMs), then
+   * Instagram/Facebook DMs whose window has closed (served with
+   * {@code reply_window.open} {@code false}: answer them from the native
+   * app or mark them read), then comments and mentions, oldest first by
+   * default; {@code order} = {@code newest} reverses the order within each
+   * group. Replies typed in the native apps count as answers (they are
    * mirrored into the inbox), so a thread a colleague answered on their
    * phone is not served again. Instagram mentions are skipped (no reply
    * path). Looks at the last 30 days of activity. Requires the
@@ -279,13 +316,19 @@ public final class InboxResource extends ApiResource {
    * {@link Iterable} of ids).
    *
    * <p>Returns {@code { data: InboxNextUnanswered | null, remaining: int }}.
-   * {@code data} is {@code { conversation, message, messages }}, or JSON
-   * {@code null} when nothing is waiting. {@code message} is the unanswered
-   * incoming item itself (the customer's latest DM, or the specific comment):
-   * its {@code id} is what {@link #hide(String)} and
-   * {@link #deleteMessage(String)} take, its {@code conversation_id} is what
-   * {@link #reply(String, Map)} takes. {@code messages} is the conversation
-   * so far, oldest first (the most recent 50 messages for long DM threads).
+   * {@code data} is {@code { conversation, message, messages, reply_window }},
+   * or JSON {@code null} when nothing is waiting. {@code message} is the
+   * unanswered incoming item itself (the customer's latest DM, or the
+   * specific comment): its {@code id} is what {@link #hide(String)} and
+   * {@link #deleteMessage(String)} take and the {@code message_id} to pass
+   * to {@link #reply(String, Map)} on comment threads, its
+   * {@code conversation_id} is what {@link #reply(String, Map)} takes.
+   * {@code messages} is the conversation so far, oldest first (the most
+   * recent 50 messages for long DM threads). {@code reply_window} is
+   * {@code { open, closes_at }}: {@code open} is {@code false} only for an
+   * Instagram/Facebook DM past its 24-hour window, which
+   * {@link #reply(String, Map)} refuses with 422
+   * {@code outside_messaging_window}.
    * {@code remaining} is the number of unanswered items still waiting after
    * this one (capped at 500), {@code 0} when {@code data} is null. To chain
    * the queue, pass {@code include_next} = {@code true} to
