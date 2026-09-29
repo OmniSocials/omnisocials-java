@@ -39,7 +39,9 @@ public final class MediaResource extends ApiResource {
    * {@link #createUploadUrl} for larger videos, up to 1GB).
    *
    * <p>A PDF is rasterized into image slides and returned as a carousel
-   * ({@code slides} + {@code media_ids}).
+   * ({@code slides} + {@code media_ids}); pass {@code pdf_mode} = "document"
+   * to keep it as ONE item of type "document" whose single id in
+   * {@code media_ids} expands into every page.
    */
   public JsonNode upload(byte[] file, String filename) {
     return upload(file, filename, null);
@@ -47,7 +49,7 @@ public final class MediaResource extends ApiResource {
 
   /**
    * {@code POST /media/upload} - upload raw bytes with extra form fields.
-   * Supported params: {@code name}, {@code folder}, {@code folder_id}.
+   * Supported params: {@code name}, {@code folder}, {@code folder_id}, {@code pdf_mode} ("slides" or "document").
    */
   public JsonNode upload(byte[] file, String filename, Map<String, Object> params) {
     String contentType = filename == null ? null : URLConnection.guessContentTypeFromName(filename);
@@ -61,7 +63,7 @@ public final class MediaResource extends ApiResource {
 
   /**
    * {@code POST /media/upload} - upload a file from disk with extra form
-   * fields. Supported params: {@code name}, {@code folder}, {@code folder_id}.
+   * fields. Supported params: {@code name}, {@code folder}, {@code folder_id}, {@code pdf_mode} ("slides" or "document").
    */
   public JsonNode upload(Path file, Map<String, Object> params) {
     byte[] bytes;
@@ -83,7 +85,7 @@ public final class MediaResource extends ApiResource {
    * {@code POST /media/upload-from-url} - the server fetches a public URL
    * (files up to 1GB; large videos finish processing in the background and
    * come back with status "processing"). Params: {@code url} (required),
-   * {@code name}, {@code folder}.
+   * {@code name}, {@code folder}, {@code folder_id}, {@code pdf_mode}.
    */
   public JsonNode uploadFromUrl(Map<String, Object> params) {
     return client.post("/media/upload-from-url", params);
@@ -92,7 +94,8 @@ public final class MediaResource extends ApiResource {
   /**
    * {@code POST /media/upload-from-base64} - upload base64-encoded file data.
    * Params: {@code data} (no data URI prefix), {@code mime_type},
-   * {@code filename}, {@code name}, {@code folder}.
+   * {@code filename}, {@code name}, {@code folder}, {@code folder_id},
+   * {@code pdf_mode}.
    */
   public JsonNode uploadFromBase64(Map<String, Object> params) {
     return client.post("/media/upload-from-base64", params);
