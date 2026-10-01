@@ -204,4 +204,23 @@ public final class PostsResource extends ApiResource {
   public JsonNode reject(String id) {
     return reject(id, null);
   }
+
+  /**
+   * {@code GET /posts/:id/approval} - the approval review of a post: every
+   * step with its approvers and their decisions, the rejection with its
+   * reason, and the comment thread. Use it when {@code approval_status} is
+   * {@code rejected} to learn who rejected the post and why, or while it is
+   * {@code pending} to see who the post waits for.
+   *
+   * <p>{@code data} carries {@code post_id}, {@code status} ({@code none},
+   * {@code pending}, {@code approved}, {@code rejected}), {@code workflow},
+   * {@code requested_by}, {@code requested_at}, {@code current_step},
+   * {@code steps}, {@code rejection} and {@code comments} (oldest first). A
+   * post without an approval workflow returns {@code status: "none"} with
+   * the object fields null and empty {@code steps} and {@code comments}.
+   * Read-only; requires the {@code posts:read} scope.
+   */
+  public JsonNode getApproval(String id) {
+    return client.get("/posts/" + seg(id) + "/approval");
+  }
 }

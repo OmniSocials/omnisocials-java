@@ -40,7 +40,7 @@ class ResourceSurfaceTest {
     assertHasMethods(
         PostsResource.class,
         "list", "get", "create", "createAndPublish", "update", "delete", "publish",
-        "recentPlatform");
+        "recentPlatform", "approve", "reject", "getApproval");
   }
 
   @Test

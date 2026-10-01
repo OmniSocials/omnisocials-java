@@ -46,6 +46,25 @@ class WebhooksTest {
   }
 
   @Test
+  void rejectedEventKeepsItsApprovalObject() throws Exception {
+    String body =
+        "{\"id\":\"evt_456\",\"type\":\"post.rejected\","
+            + "\"data\":{\"post_id\":\"123456\",\"status\":\"rejected\",\"targets\":[],"
+            + "\"approval\":{\"status\":\"rejected\",\"decided_by\":\"c4a09e1d\","
+            + "\"reason\":\"Wrong product photo\"}}}";
+    long ts = System.currentTimeMillis() / 1000L;
+
+    JsonNode event = Webhooks.verifySignature(body, sign(SECRET, ts, body), SECRET, 300);
+
+    assertEquals("post.rejected", event.get("type").asText());
+    JsonNode approval = event.get("data").get("approval");
+    assertEquals("rejected", approval.get("status").asText());
+    assertEquals("c4a09e1d", approval.get("decided_by").asText());
+    assertEquals("Wrong product photo", approval.get("reason").asText());
+    assertEquals(0, event.get("data").get("targets").size());
+  }
+
+  @Test
   void tamperedPayloadFails() throws Exception {
     long ts = System.currentTimeMillis() / 1000L;
     String header = sign(SECRET, ts, BODY);
