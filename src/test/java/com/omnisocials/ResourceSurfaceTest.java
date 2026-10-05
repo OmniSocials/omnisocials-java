@@ -10,6 +10,7 @@ import com.omnisocials.resources.HashtagSetsResource;
 import com.omnisocials.resources.InboxResource;
 import com.omnisocials.resources.LocationsResource;
 import com.omnisocials.resources.MediaResource;
+import com.omnisocials.resources.PinterestResource;
 import com.omnisocials.resources.PostsResource;
 import com.omnisocials.resources.WebhooksResource;
 import java.lang.reflect.Method;
@@ -79,6 +80,11 @@ class ResourceSurfaceTest {
   }
 
   @Test
+  void pinterestSurface() {
+    assertHasMethods(PinterestResource.class, "listProducts", "validateProduct");
+  }
+
+  @Test
   void inboxSurface() {
     assertHasMethods(
         InboxResource.class,
@@ -101,6 +107,7 @@ class ResourceSurfaceTest {
     assertNotNull(client.accounts());
     assertNotNull(client.analytics());
     assertNotNull(client.locations());
+    assertNotNull(client.pinterest());
     assertNotNull(client.inbox());
     assertNotNull(client.webhooks());
     assertHasMethods(OmniSocials.class, "health", "fromEnv", "builder");

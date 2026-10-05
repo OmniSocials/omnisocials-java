@@ -75,6 +75,17 @@ public final class PostsResource extends ApiResource {
    * {@code validation_error} asking you to reconnect Threads when the
    * connection lacks the {@code threads_location_tagging} permission).
    *
+   * <p>Pinterest posts can tag products: {@code product_tags} inside the
+   * {@code pinterest} map takes up to 24 product Pins of the connected
+   * Pinterest account, each as a Pin id string (see
+   * {@link PinterestResource#listProducts()}) or a Pin link. Products of
+   * other merchants cannot be tagged. The tags are added right after the Pin
+   * is published; a product Pinterest refuses never fails the post, and the
+   * Post's {@code pinterest} block then carries {@code product_tags_result}
+   * ({@code requested}, {@code tagged}, {@code skipped}, {@code error}). More
+   * than 24 entries or an invalid entry throws a 400
+   * {@code validation_error}.
+   *
    * <p>Each {@code media_urls} / {@code media_ids} entry is a plain string, or
    * a map with an {@code alt} accessibility description (max 1500 chars):
    * {@code Map.of("url", "https://...", "alt", "...")} for media_urls,
@@ -133,6 +144,10 @@ public final class PostsResource extends ApiResource {
    * tag clears the same way: {@code location_id: null} (or
    * {@code location: null}) inside {@code threads} removes the tag, while
    * omitting the key leaves it untouched.
+   *
+   * <p>The {@code pinterest} map replaces the stored Pinterest options
+   * wholesale, so leave {@code product_tags} out (or send an empty list) to
+   * remove the product tags.
    *
    * <p>See {@link #create(Map)} for the X link-post credit gate (402
    * {@code x_credits_insufficient}), which also applies here when the update

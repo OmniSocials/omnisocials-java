@@ -17,6 +17,7 @@ import com.omnisocials.resources.HashtagSetsResource;
 import com.omnisocials.resources.InboxResource;
 import com.omnisocials.resources.LocationsResource;
 import com.omnisocials.resources.MediaResource;
+import com.omnisocials.resources.PinterestResource;
 import com.omnisocials.resources.PostsResource;
 import com.omnisocials.resources.WebhooksResource;
 import java.io.IOException;
@@ -65,7 +66,7 @@ import java.util.stream.Collectors;
 public final class OmniSocials {
 
   /** SDK version, also used in the User-Agent header. */
-  public static final String VERSION = "0.8.0";
+  public static final String VERSION = "0.9.0";
 
   public static final String DEFAULT_BASE_URL = "https://api.omnisocials.com/v1";
   public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
@@ -90,6 +91,7 @@ public final class OmniSocials {
   private final AnalyticsResource analytics;
   private final AudioResource audio;
   private final LocationsResource locations;
+  private final PinterestResource pinterest;
   private final InboxResource inbox;
   private final WebhooksResource webhooks;
 
@@ -113,6 +115,7 @@ public final class OmniSocials {
     this.analytics = new AnalyticsResource(this);
     this.audio = new AudioResource(this);
     this.locations = new LocationsResource(this);
+    this.pinterest = new PinterestResource(this);
     this.inbox = new InboxResource(this);
     this.webhooks = new WebhooksResource(this);
   }
@@ -163,6 +166,10 @@ public final class OmniSocials {
 
   public LocationsResource locations() {
     return locations;
+  }
+
+  public PinterestResource pinterest() {
+    return pinterest;
   }
 
   public InboxResource inbox() {

@@ -15,14 +15,14 @@ Maven:
 <dependency>
   <groupId>com.omnisocials</groupId>
   <artifactId>omnisocials-java</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation "com.omnisocials:omnisocials-java:0.8.0"
+implementation "com.omnisocials:omnisocials-java:0.9.0"
 ```
 
 ## Quickstart
@@ -461,6 +461,41 @@ client.posts().create(Params.builder()
 ```
 
 The Threads response is `{ locations: [...] }` (each with nullable `name`, `address`, `city`, `country`, `latitude`, `longitude`) or `{ error: { code, message } }` with `code` one of `not_available`, `threads_not_connected`, `threads_reauth_required` (reconnect Threads), or `platform_error`. Threads location tagging is currently rolling out; until Meta approves the permissions it is disabled on production and calls return a clear error.
+
+## Pinterest product tags
+
+Tag products on a Pin so people can shop the items in the image. `client.pinterest().listProducts()` returns the product Pins of the connected Pinterest account; pass their `pin_id` values (max 24) as `product_tags` in the `pinterest` map of the post. Only product Pins of your own account can be tagged; products of other merchants cannot. The tags are added right after the Pin is published. A product that Pinterest refuses never fails the post: the outcome is on the post as `pinterest.product_tags_result` (`requested`, `tagged`, `skipped`, `error`).
+
+```java
+JsonNode result = client.pinterest().listProducts();
+
+if (result.has("error")) {
+  // HTTP 200 without `products`: pinterest_not_connected,
+  // pinterest_catalog_access_required or platform_error
+  System.err.println(result.get("error").get("code").asText());
+} else {
+  List<String> productTags = new ArrayList<>();
+  for (JsonNode product : result.get("products")) {
+    if (productTags.size() < 3) {
+      productTags.add(product.get("pin_id").asText());
+    }
+  }
+
+  client.posts().create(Params.builder()
+      .put("content", "Our summer picks")
+      .put("channels", List.of("pinterest"))
+      .put("media_urls", List.of("https://example.com/summer-look.jpg"))
+      .put("scheduled_at", "2026-08-01T09:00:00Z")
+      .put("pinterest", Params.builder()
+          .put("board_id", "1234567890")
+          .put("title", "Summer picks")
+          .put("product_tags", productTags)
+          .build())
+      .build());
+}
+```
+
+Without `source` the list reads the Pinterest catalog (with `price`, `currency`, `availability` and `item_id`) when the connection has catalog access, else the account's own Pins. Catalog access is given one time in the OmniSocials composer: Pinterest options, Add products, Connect catalog. `listProducts(Params.of("source", "pins"))` scans up to 250 Pins per call, so `products` can be empty while `bookmark` is set; call again with `Params.of("source", "pins", "bookmark", bookmark)`. To check one Pin id or Pin link before you post, call `client.pinterest().validateProduct("813744226420795884")`. On `posts().update()` the `pinterest` map replaces the stored one, so leave `product_tags` out to remove the tags.
 
 ## Inbox
 
