@@ -65,14 +65,14 @@ import java.util.stream.Collectors;
 public final class OmniSocials {
 
   /** SDK version, also used in the User-Agent header. */
-  public static final String VERSION = "0.7.0";
+  public static final String VERSION = "0.8.0";
 
   public static final String DEFAULT_BASE_URL = "https://api.omnisocials.com/v1";
   public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
   public static final int DEFAULT_MAX_RETRIES = 2;
 
   private static final String USER_AGENT = "omnisocials-java/" + VERSION;
-  private static final String ENV_API_KEY = "OMNISOCIALS_API_KEY";
+  private static final String API_KEY_ENV_VAR = "OMNISOCIALS_API_KEY";
 
   private final String apiKey;
   private final String baseUrl;
@@ -462,7 +462,7 @@ public final class OmniSocials {
      *     {@code OMNISOCIALS_API_KEY} environment variable is not set
      */
     public OmniSocials build() {
-      String key = apiKey != null ? apiKey : envLookup.apply(ENV_API_KEY);
+      String key = apiKey != null ? apiKey : envLookup.apply(API_KEY_ENV_VAR);
       if (key == null || key.isEmpty()) {
         throw new AuthenticationException(
             401,

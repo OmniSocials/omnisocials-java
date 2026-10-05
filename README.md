@@ -15,14 +15,14 @@ Maven:
 <dependency>
   <groupId>com.omnisocials</groupId>
   <artifactId>omnisocials-java</artifactId>
-  <version>0.7.0</version>
+  <version>0.8.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation "com.omnisocials:omnisocials-java:0.7.0"
+implementation "com.omnisocials:omnisocials-java:0.8.0"
 ```
 
 ## Quickstart
@@ -488,7 +488,7 @@ client.inbox().hide(messageId, false); // unhide
 client.inbox().deleteMessage(messageId);
 ```
 
-Conversation and message lists use cursor pagination (`pagination.next_cursor` / `pagination.has_more`), not the offset pagination used elsewhere in this API. `platform` accepts `instagram`, `facebook`, `linkedin`, `tiktok`, `youtube`, `x`, or `threads`; a message's `direction` is `"incoming"` or `"outgoing"`. Threads conversations are comments (replies people leave on your Threads posts) and mentions; there are no Threads DMs. Comments can be hidden on Facebook, Instagram, TikTok, YouTube, and Threads (Threads: incoming top-level replies only), and a hidden message keeps its place in the conversation with its `hidden` flag set; `hidden` is `true`/`false` on comments and JSON `null` on DMs. A comment/mention's `post` carries `url` (public link when the platform provides one) and `media_type` (the platform's own label) next to `id`, `caption`, and `thumbnail`. Threads inbox is currently rolling out; until Meta approves the permissions it is disabled on production and calls return a clear error, and it needs a Threads connection with the reply permission (a 401 `reauth_required` means reconnect Threads). TikTok and YouTube replies are comments only; TikTok replies are capped at 150 characters.
+Conversation and message lists use cursor pagination (`pagination.next_cursor` / `pagination.has_more`), not the offset pagination used elsewhere in this API. `platform` accepts `instagram`, `facebook`, `linkedin`, `tiktok`, `youtube`, `x`, or `threads`; a message's `direction` is `"incoming"` or `"outgoing"`. Threads conversations are comments (replies people leave on your Threads posts) and mentions; there are no Threads DMs. Comments can be hidden on Facebook, Instagram, TikTok, YouTube, and Threads (Threads: incoming top-level replies only), and a hidden message keeps its place in the conversation with its `hidden` flag set; `hidden` is `true`/`false` on comments and JSON `null` on DMs. A comment/mention's `post` carries `url` (public link when the platform provides one) and `media_type` (the platform's own label) next to `id`, `caption`, and `thumbnail`. The Threads inbox needs a Threads connection with the reply permission (a 401 `reauth_required` means reconnect Threads; an account connected before 2026-09-14 needs this once). TikTok and YouTube replies are comments only; TikTok replies are capped at 150 characters.
 
 ### Work queue: what needs an answer
 
