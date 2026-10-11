@@ -16,7 +16,11 @@ public final class MediaResource extends ApiResource {
     super(client);
   }
 
-  /** {@code GET /media} - list the media library (newest first). */
+  /**
+   * {@code GET /media} - list the media library (newest first). Each item
+   * carries {@code width} and {@code height} (pixels; null for videos and
+   * older files).
+   */
   public JsonNode list() {
     return client.get("/media");
   }
@@ -117,6 +121,19 @@ public final class MediaResource extends ApiResource {
    * workspace's connected platforms BEFORE uploading. Provide one of: a
    * public {@code url}, an existing {@code media_id}, or {@code size_bytes} +
    * {@code mime}.
+   *
+   * <p>The result carries {@code file} ({@code size_bytes}, {@code mime},
+   * {@code size_known}, {@code width}, {@code height}; the pixel size is
+   * known for library images, null otherwise), {@code connected_platforms},
+   * {@code compatible}, {@code warnings}, {@code summary} and {@code fit}:
+   * one entry per connected channel with a fit rule for an IMAGE as a feed
+   * post ({@code platform}, {@code display_name}, {@code fits},
+   * {@code ratio}, {@code shown} = {@code whole} | {@code cut},
+   * {@code target}, {@code default_action} = {@code crop} | {@code keep} |
+   * null, {@code message}). {@code fits: false} = the ratio is outside the
+   * window the channel shows uncropped; {@code default_action} is what a
+   * post create does unless the post's {@code media_fit} says otherwise.
+   * Empty for videos and unknown sizes.
    */
   public JsonNode check(Map<String, Object> params) {
     return client.post("/media/check", params);

@@ -15,14 +15,14 @@ Maven:
 <dependency>
   <groupId>com.omnisocials</groupId>
   <artifactId>omnisocials-java</artifactId>
-  <version>0.9.0</version>
+  <version>0.10.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation "com.omnisocials:omnisocials-java:0.9.0"
+implementation "com.omnisocials:omnisocials-java:0.10.0"
 ```
 
 ## Quickstart
@@ -117,6 +117,53 @@ client.posts().create(Params.builder()
     .put("scheduled_at", "2026-08-01T09:00:00Z")
     .build());
 ```
+
+### Planned drafts
+
+Put `draft` `true` next to `scheduled_at` to store the post as a draft that keeps its time. It shows on the dashboard calendar at that slot with a dashed outline and the scheduler never publishes it: a person schedules it from the composer, or you do with `update` and `draft` `false`. Use it when an agent proposes a slot that a human should confirm. A draft is not allowed with `publish_now` or `approval_workflow_id` (`400 validation_error`). On `update`, `draft` `false` without `scheduled_at` is a `400 validation_error` when the draft has no time or its time is in the past (pass a new `scheduled_at` then), and `draft` `true` on a scheduled post unschedules it while keeping the time.
+
+```java
+JsonNode proposal = client.posts().create(Params.builder()
+    .put("content", "Proposed for Friday morning")
+    .put("channels", List.of("instagram", "linkedin"))
+    .put("scheduled_at", "2026-08-01T09:00:00Z")
+    .put("draft", true)
+    .build()).get("data");
+System.out.println(proposal.get("status").asText() + " " + proposal.get("schedule_at").asText()); // draft, the time is kept
+
+// The human agrees: schedule it at the time it already carries
+client.posts().update(proposal.get("id").asText(), Params.of("draft", false));
+```
+
+### Comment-to-DM automations
+
+Answer a keyword in an Instagram comment with a DM, once per person, with an optional public reply under the comment. Put `comment_dm_automation` on `create` (Instagram must be in `channels`) and the automation is bound to that post; it starts listening once the post is live. Needs the opt-in `automations:write` scope on the key. `client.automations()` manages the automations themselves (`list`, `get`, `create`, `update`, `delete`) and reads their activity (`listEvents`, `automations:read`). On `update`, `comment_dm_automation` as a map replaces the post's automation and an explicit `null` (`Params.builder().put("comment_dm_automation", null)`) removes it. Instagram rules: one private reply per comment, within 7 days; OmniSocials caps sends at 180 DMs an hour per account.
+
+```java
+JsonNode post = client.posts().create(Params.builder()
+    .put("content", "Comment GUIDE and I will send you the link")
+    .put("channels", List.of("instagram"))
+    .put("scheduled_at", "2026-08-01T09:00:00Z")
+    .put("media_urls", List.of("https://example.com/guide-cover.jpg"))
+    .put("comment_dm_automation", Params.builder()
+        .put("trigger", Params.of("keywords", List.of("guide"), "match", "word"))
+        .put("actions", Params.of(
+            "dm", Params.of("text", "Here is the guide: https://example.com/guide"),
+            "public_reply", Params.of("enabled", true, "variations", List.of("Sent you a DM!", "Check your inbox"))))
+        .put("limits", Params.of("max_sends", 500))
+        .build())
+    .build()).get("data");
+String automationId = post.get("comment_dm_automation").get("id").asText();
+
+// Later: who was answered, and why someone was skipped
+JsonNode events = client.automations().listEvents(automationId, Params.of("outcome", "sent"));
+System.out.println(events.get("counts")); // {"sent":12,"skipped":3}
+for (JsonNode event : events.get("data")) {
+  System.out.println(event.get("person").get("username").asText() + " " + event.get("outcome").asText());
+}
+```
+
+The events response is `data`, `counts` and `pagination`, not the plain list: `counts` is the number of events per outcome (`sent`, `skipped`, `failed`, `pending`). An automation can also listen on a post published outside OmniSocials (`client.automations().create(...)` with `instagram_media_id`), on the next post the workspace publishes (`trigger` with `scope` `next_post`) or on every post (`scope` `any`), and on DMs and story replies (`kinds` `["dm", "story_reply"]`).
 
 ### Publish immediately
 
@@ -687,7 +734,7 @@ try {
 
 ## API scopes
 
-Each API key carries scopes: `posts:read`, `posts:write`, `media:write`, `accounts:read`, `analytics:read`, `webhooks:manage`. A call with a missing scope throws `PermissionDeniedException` with code `insufficient_scope`.
+Each API key carries scopes: `posts:read`, `posts:write`, `media:write`, `accounts:read`, `analytics:read`, `webhooks:manage`, plus the opt-in `automations:read` / `automations:write` for comment-to-DM automations. A call with a missing scope throws `PermissionDeniedException` with code `insufficient_scope`.
 
 ## Documentation
 

@@ -122,6 +122,44 @@ public final class PostsResource extends ApiResource {
    * last step approves. Requires {@code scheduled_at}; not allowed with
    * {@code publish_now}. Errors: {@code 404 workflow_not_found},
    * {@code 400 validation_error}.
+   *
+   * <p>{@code draft: true} with {@code scheduled_at} stores a planned draft:
+   * the post is {@code draft} and keeps that time, shows on the dashboard
+   * calendar at that slot with a dashed outline, and the scheduler never
+   * publishes it. A person schedules it from the composer, or you do with
+   * {@link #update(String, Map)} and {@code draft: false}. Use it when an
+   * agent proposes a slot that a human should confirm. Not allowed with
+   * {@code publish_now} or {@code approval_workflow_id}
+   * ({@code 400 validation_error}). Without {@code scheduled_at} it changes
+   * nothing.
+   *
+   * <p>{@code media_fit} is the image fit per channel for feed images whose
+   * ratio is outside what a channel shows uncropped: a map of platform id
+   * ({@code "instagram"}, {@code "pinterest"}, ...) to {@code "auto"},
+   * {@code "crop"} or {@code "keep"}. {@code auto} (default): Instagram crops
+   * a tall or wide image to 4:5 / 1.91:1 around the subject (Instagram cuts
+   * it to that window anyway and Meta cannot boost a feed post outside it);
+   * Pinterest keeps a Pin taller than 2:3 and reports it. {@code crop} /
+   * {@code keep} force it per channel. Every decision comes back in the same
+   * {@code warnings} array with code {@code image_fit} ({@code action} is
+   * {@code cropped}, {@code kept} or {@code crop_failed}, with
+   * {@code platform}, {@code media_url}, {@code ratio}, {@code target} and
+   * {@code crop_url}).
+   *
+   * <p>{@code comment_dm_automation} binds a comment-to-DM automation to the
+   * post (Instagram must be in {@code channels}): a keyword in a comment is
+   * answered with a DM, once per person, with an optional public reply under
+   * the comment. A map of {@code trigger} ({@code keywords}, {@code match}),
+   * {@code actions} ({@code dm} with {@code text}, optional
+   * {@code public_reply} with {@code enabled} and {@code variations}) and
+   * {@code limits} ({@code max_sends}, {@code stop_at}); see
+   * {@link AutomationsResource#create(Map)} for the fields. Needs the
+   * {@code automations:write} scope on the key ({@code 403
+   * insufficient_scope}, checked before anything else); a bad map is a
+   * {@code 400 validation_error} whose message starts with
+   * {@code comment_dm_automation: }. The response then carries
+   * {@code data.comment_dm_automation} (the automation, with {@code post}
+   * null); it starts listening once the post is live on Instagram.
    */
   public JsonNode create(Map<String, Object> params) {
     return client.post("/posts/create", params);
@@ -129,8 +167,9 @@ public final class PostsResource extends ApiResource {
 
   /**
    * {@code POST /posts/create-and-publish} - create a post and publish it immediately.
-   * See {@link #create(Map)} for the {@code warnings} array on X link posts
-   * and the X link-post credit gate (402 {@code x_credits_insufficient}).
+   * See {@link #create(Map)} for the {@code warnings} array (X link posts,
+   * and the {@code image_fit} entries steered by {@code media_fit}) and the
+   * X link-post credit gate (402 {@code x_credits_insufficient}).
    */
   public JsonNode createAndPublish(Map<String, Object> params) {
     return client.post("/posts/create-and-publish", params);
@@ -149,9 +188,31 @@ public final class PostsResource extends ApiResource {
    * wholesale, so leave {@code product_tags} out (or send an empty list) to
    * remove the product tags.
    *
+   * <p>{@code draft: false} without {@code scheduled_at} schedules a planned
+   * draft at the {@code scheduled_at} it already carries
+   * ({@code 400 validation_error} when it has none or it is in the past).
+   * {@code draft: true} without {@code scheduled_at} unschedules a scheduled
+   * post: it keeps its time and stays on the calendar as a dashed draft,
+   * nothing publishes; a post waiting for approval leaves its workflow.
+   * {@code draft: true} with {@code scheduled_at} moves the time and keeps
+   * (or makes) the post a draft.
+   *
+   * <p>{@code media_fit} (same shape as on {@link #create(Map)}) alone
+   * re-decides the stored images: {@code "keep"} gives the original back,
+   * {@code "crop"} crops an image that was kept. Like {@link #create(Map)},
+   * the response can carry a top-level {@code warnings} array with
+   * {@code image_fit} entries when the update changes the images or
+   * {@code media_fit}.
+   *
    * <p>See {@link #create(Map)} for the X link-post credit gate (402
    * {@code x_credits_insufficient}), which also applies here when the update
    * (re)schedules an X post whose text contains a URL.
+   *
+   * <p>{@code comment_dm_automation} (same shape as on {@link #create(Map)})
+   * as a map replaces the post's comment-to-DM automation, an explicit
+   * {@code null} ({@code Params.builder().put("comment_dm_automation", null)})
+   * removes it, and omitting the key leaves it untouched. Needs the
+   * {@code automations:write} scope.
    */
   public JsonNode update(String id, Map<String, Object> params) {
     return client.patch("/posts/" + seg(id), params);

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.omnisocials.resources.AccountsResource;
 import com.omnisocials.resources.AnalyticsResource;
+import com.omnisocials.resources.AutomationsResource;
 import com.omnisocials.resources.FoldersResource;
 import com.omnisocials.resources.HashtagSetsResource;
 import com.omnisocials.resources.InboxResource;
@@ -85,6 +86,12 @@ class ResourceSurfaceTest {
   }
 
   @Test
+  void automationsSurface() {
+    assertHasMethods(
+        AutomationsResource.class, "list", "get", "create", "update", "delete", "listEvents");
+  }
+
+  @Test
   void inboxSurface() {
     assertHasMethods(
         InboxResource.class,
@@ -108,6 +115,7 @@ class ResourceSurfaceTest {
     assertNotNull(client.analytics());
     assertNotNull(client.locations());
     assertNotNull(client.pinterest());
+    assertNotNull(client.automations());
     assertNotNull(client.inbox());
     assertNotNull(client.webhooks());
     assertHasMethods(OmniSocials.class, "health", "fromEnv", "builder");
