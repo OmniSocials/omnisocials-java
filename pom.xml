@@ -6,12 +6,12 @@
 
   <groupId>com.omnisocials</groupId>
   <artifactId>omnisocials-java</artifactId>
-  <version>0.10.0</version>
+  <version>0.11.0</version>
   <packaging>jar</packaging>
 
   <name>OmniSocials Java SDK</name>
   <description>Official Java client for the OmniSocials API. Schedule and publish posts to Instagram, Facebook, LinkedIn, YouTube, TikTok, X, Pinterest, Bluesky, Threads, Mastodon, and Google Business from one API.</description>
-  <url>https://docs.omnisocials.com</url>
+  <url>https://omnisocials.com/sdk/java</url>
 
   <licenses>
     <license>
@@ -20,6 +20,29 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
+
+  <!-- Maven Central requires developers and scm (with name, description, url
+       and licenses above). See sdk/RELEASING.md, "Maven Central setup". -->
+  <developers>
+    <developer>
+      <id>omnisocials</id>
+      <name>OmniSocials</name>
+      <email>hello@omnisocials.com</email>
+      <organization>OmniSocials</organization>
+      <organizationUrl>https://omnisocials.com</organizationUrl>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/OmniSocials/omnisocials-java.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/OmniSocials/omnisocials-java.git</developerConnection>
+    <url>https://github.com/OmniSocials/omnisocials-java</url>
+  </scm>
+
+  <issueManagement>
+    <system>GitHub</system>
+    <url>https://github.com/OmniSocials/omnisocials-java/issues</url>
+  </issueManagement>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -67,4 +90,86 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- Publishing to Maven Central (Sonatype Central Portal). Used by the
+         maven job in .github/workflows/sdk-release.yml as
+         `mvn -P release deploy`. Builds the sources and javadoc jars Central
+         requires, signs every file with GPG, and uploads the bundle to the
+         Central Portal with the server id "central" (credentials come from
+         settings.xml, written by actions/setup-java). Try it locally without
+         signing or uploading: `mvn -P release -Dgpg.skip package`. -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>3.3.1</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.12.0</version>
+            <configuration>
+              <!-- A javadoc lint warning must not block a release. -->
+              <doclint>none</doclint>
+              <quiet>true</quiet>
+            </configuration>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.8</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+                <configuration>
+                  <!-- The passphrase comes from the MAVEN_GPG_PASSPHRASE
+                       environment variable. Loopback lets gpg take it without
+                       a terminal. -->
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.11.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>true</autoPublish>
+              <waitUntil>validated</waitUntil>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

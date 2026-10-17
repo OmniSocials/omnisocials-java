@@ -67,7 +67,7 @@ import java.util.stream.Collectors;
 public final class OmniSocials {
 
   /** SDK version, also used in the User-Agent header. */
-  public static final String VERSION = "0.10.0";
+  public static final String VERSION = "0.11.0";
 
   public static final String DEFAULT_BASE_URL = "https://api.omnisocials.com/v1";
   public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
@@ -433,7 +433,7 @@ public final class OmniSocials {
     private Builder() {}
 
     /**
-     * API key ({@code omsk_live_*} / {@code omsk_test_*}). When not set, the
+     * API key ({@code omsk_live_*}). When not set, the
      * builder falls back to the {@code OMNISOCIALS_API_KEY} environment
      * variable.
      */

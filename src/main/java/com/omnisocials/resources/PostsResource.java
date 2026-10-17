@@ -86,6 +86,19 @@ public final class PostsResource extends ApiResource {
    * than 24 entries or an invalid entry throws a 400
    * {@code validation_error}.
    *
+   * <p>Telegram posts take a {@code telegram} map (the connected channel or
+   * group, posted by the OmniSocials bot): {@code silent}, {@code
+   * link_preview}, {@code pin}, {@code protect_content}, {@code spoiler},
+   * {@code caption_above_media} (booleans), up to 3 {@code buttons}
+   * ({@code { text, url }}, not on an album or a poll), a native {@code poll}
+   * ({@code { options: 2 to 12 of up to 100 characters, open_period: 5 to
+   * 2628000 seconds, multiple }}; the post text is the question, max 300
+   * characters, no media) and {@code first_comment} (a reply under the
+   * post). Text up to 4,096 characters; with media, text over 1,024
+   * characters is sent as a reply under the media. No Stories. On update
+   * every key merges into the stored options. Once sent, the Post's
+   * {@code telegram} block carries {@code result} (message ids and links).
+   *
    * <p>Each {@code media_urls} / {@code media_ids} entry is a plain string, or
    * a map with an {@code alt} accessibility description (max 1500 chars):
    * {@code Map.of("url", "https://...", "alt", "...")} for media_urls,
