@@ -99,6 +99,23 @@ public final class PostsResource extends ApiResource {
    * every key merges into the stored options. Once sent, the Post's
    * {@code telegram} block carries {@code result} (message ids and links).
    *
+   * <p>Discord posts take a {@code discord} map (one Discord channel, posted
+   * through its incoming webhook with the webhook's name and picture):
+   * {@code silent}, {@code link_preview} (default on), {@code
+   * allow_mentions} (default off: @everyone, @here, role and user mentions
+   * show as text and ping nobody), {@code spoiler} (booleans), {@code
+   * thread_name} (the post title in a forum or media channel, 1 to 100
+   * characters; on a text channel the post goes out without it), up to 5
+   * {@code buttons}
+   * ({@code { text: 1 to 80 characters, url: https:// or http:// }}, one
+   * row, not with a poll) and a native {@code poll} ({@code { options: 2 to
+   * 10 of up to 55 characters, duration_hours: 1 to 768 (default 24),
+   * multiple }}; the post text is the question, max 300 characters, no
+   * media and no buttons). Text up to 2,000 characters; up to 10 images,
+   * GIFs and videos per message, a video or GIF over 20 MB is sent as a link
+   * in the text. No Stories. Once sent, the Post's {@code discord} block
+   * carries {@code result} (message id and link).
+   *
    * <p>Each {@code media_urls} / {@code media_ids} entry is a plain string, or
    * a map with an {@code alt} accessibility description (max 1500 chars):
    * {@code Map.of("url", "https://...", "alt", "...")} for media_urls,
@@ -160,19 +177,24 @@ public final class PostsResource extends ApiResource {
    * {@code crop_url}).
    *
    * <p>{@code comment_dm_automation} binds a comment-to-DM automation to the
-   * post (Instagram must be in {@code channels}): a keyword in a comment is
-   * answered with a DM, once per person, with an optional public reply under
-   * the comment. A map of {@code trigger} ({@code keywords}, {@code match}),
-   * {@code actions} ({@code dm} with {@code text}, optional
-   * {@code public_reply} with {@code enabled} and {@code variations}) and
-   * {@code limits} ({@code max_sends}, {@code stop_at}); see
+   * post (Instagram or Facebook must be in {@code channels}): a keyword in a
+   * comment is answered with a DM, once per person, with an optional public
+   * reply under the comment. A map of {@code trigger} ({@code keywords},
+   * {@code match}), {@code actions} ({@code dm} with {@code text}, optional
+   * {@code public_reply} with {@code enabled} and {@code variations}),
+   * {@code limits} ({@code max_sends}, {@code stop_at}) and
+   * {@code platforms} ({@code ["instagram", "facebook"]}: one automation per
+   * listed channel, each a channel of the post; without it Instagram when the
+   * post goes there, else Facebook); see
    * {@link AutomationsResource#create(Map)} for the fields. Needs the
    * {@code automations:write} scope on the key ({@code 403
    * insufficient_scope}, checked before anything else); a bad map is a
    * {@code 400 validation_error} whose message starts with
    * {@code comment_dm_automation: }. The response then carries
-   * {@code data.comment_dm_automation} (the automation, with {@code post}
-   * null); it starts listening once the post is live on Instagram.
+   * {@code data.comment_dm_automation} (the first automation, with
+   * {@code post} null, plus {@code platforms} and {@code automations}, one
+   * {@code id} / {@code platform} / {@code status} per channel); each starts
+   * listening once the post is live on its channel.
    */
   public JsonNode create(Map<String, Object> params) {
     return client.post("/posts/create", params);
@@ -222,10 +244,16 @@ public final class PostsResource extends ApiResource {
    * (re)schedules an X post whose text contains a URL.
    *
    * <p>{@code comment_dm_automation} (same shape as on {@link #create(Map)})
-   * as a map replaces the post's comment-to-DM automation, an explicit
+   * as a map replaces the post's comment-to-DM automations (a channel no
+   * longer in {@code platforms} loses its automation), an explicit
    * {@code null} ({@code Params.builder().put("comment_dm_automation", null)})
-   * removes it, and omitting the key leaves it untouched. Needs the
+   * removes them all, and omitting the key leaves them untouched. Needs the
    * {@code automations:write} scope.
+   *
+   * <p>{@code discord} merges into the stored Discord options: a key set to
+   * {@code null} ({@code Params.of("poll", null)}) removes that option, an
+   * explicit {@code null} for {@code discord} removes every option, and
+   * omitting the key leaves them untouched.
    */
   public JsonNode update(String id, Map<String, Object> params) {
     return client.patch("/posts/" + seg(id), params);

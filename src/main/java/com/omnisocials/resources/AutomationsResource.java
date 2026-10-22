@@ -9,7 +9,9 @@ import java.util.Map;
  *
  * <p>An automation answers a keyword in an Instagram comment (or a DM, or a
  * story reply) with a DM, once per person, with an optional public reply under
- * the comment. The scopes are opt-in on the API key: {@code automations:read}
+ * the comment. With {@code platform} {@code facebook} it runs on a Facebook
+ * Page instead, and the DM lands in Messenger (a Page has no story replies).
+ * The scopes are opt-in on the API key: {@code automations:read}
  * for list / get / listEvents, {@code automations:write} for create / update /
  * delete (and for {@code comment_dm_automation} on
  * {@link PostsResource#create(Map)}).
@@ -29,9 +31,10 @@ public final class AutomationsResource extends ApiResource {
   }
 
   /**
-   * {@code GET /automations?status=&post_id=} - list with filters. Query
-   * params: {@code status} ({@code active} | {@code paused} |
-   * {@code completed}), {@code post_id} (only the automation bound to that
+   * {@code GET /automations?status=&platform=&post_id=} - list with filters.
+   * Query params: {@code status} ({@code active} | {@code paused} |
+   * {@code completed}), {@code platform} ({@code instagram} |
+   * {@code facebook}), {@code post_id} (only the automations bound to that
    * OmniSocials post). Requires the {@code automations:read} scope.
    */
   public JsonNode list(Map<String, Object> query) {
@@ -47,11 +50,17 @@ public final class AutomationsResource extends ApiResource {
   }
 
   /**
-   * {@code POST /automations} - create a comment-to-DM automation. Bind it to
-   * one post with {@code post_id} (an OmniSocials post that goes to Instagram,
-   * scheduled or live; one automation per post) or {@code instagram_media_id}
-   * (a post published outside OmniSocials), not both; a {@code trigger} with
-   * {@code scope} {@code next_post} or {@code any} needs neither.
+   * {@code POST /automations} - create a comment-to-DM automation.
+   * {@code platform} is {@code instagram} (default) or {@code facebook}: on a
+   * Facebook Page a keyword in a comment (or a Messenger message to the Page)
+   * is answered in Messenger, and a Page has no story replies. Bind it to one
+   * post with {@code post_id} (an OmniSocials post that goes to the channel,
+   * scheduled or live; one automation per post and platform),
+   * {@code instagram_media_id} (an Instagram post published outside
+   * OmniSocials) or {@code facebook_post_id} (a Page post published outside
+   * OmniSocials, as {@code {page-id}_{post-id}} or the post id alone; implies
+   * {@code facebook}), at most one; a {@code trigger} with {@code scope}
+   * {@code next_post} or {@code any} needs none.
    *
    * <p>{@code actions} is required: {@code Map.of("dm", Map.of("text", "..."))}
    * (max 1000 characters) plus an optional {@code public_reply}
@@ -64,14 +73,17 @@ public final class AutomationsResource extends ApiResource {
    * {@code match} ({@code word} default, {@code contains}, {@code any}).
    * {@code limits} is a map of {@code max_sends} and {@code stop_at} (both
    * optional). {@code status} is {@code active} (default) or {@code paused}.
-   * Instagram rules: one private reply per comment, within 7 days; OmniSocials
-   * caps sends at 180 DMs an hour per account.
+   * Meta rules, the same on Instagram and Facebook: one private reply per
+   * comment, within 7 days; OmniSocials caps sends at 180 DMs an hour per
+   * account and platform.
    *
    * <p>Requires the {@code automations:write} scope (opt-in on the API key).
    * Errors: {@code 400 validation_error}, {@code 400 post_not_instagram},
-   * {@code 400 post_required}, {@code 404 post_not_found},
-   * {@code 404 instagram_media_not_found}, {@code 409 instagram_not_connected},
-   * {@code 409 instagram_needs_reauth}, {@code 409 automation_exists} (the
+   * {@code 400 post_not_facebook}, {@code 400 post_required},
+   * {@code 404 post_not_found}, {@code 404 instagram_media_not_found},
+   * {@code 404 facebook_post_not_found}, {@code 409 instagram_not_connected},
+   * {@code 409 instagram_needs_reauth}, {@code 409 facebook_not_connected},
+   * {@code 409 facebook_needs_reauth}, {@code 409 automation_exists} (the
    * error body also carries {@code automation_id}).
    */
   public JsonNode create(Map<String, Object> params) {
@@ -87,10 +99,13 @@ public final class AutomationsResource extends ApiResource {
    * {@code public_reply.enabled: false} or {@code variations: []} turns the
    * public reply off; {@code limits.max_sends: null} removes that limit.
    * {@code status: "paused"} pauses and {@code "active"} resumes; another
-   * {@code post_id} / {@code instagram_media_id} moves the automation to
-   * that post. A {@code completed} automation starts again when its limits
-   * or trigger change. Requires the {@code automations:write} scope.
-   * {@code 400 no_fields} when the body is empty.
+   * {@code post_id} / {@code instagram_media_id} / {@code facebook_post_id}
+   * moves the automation to that post. The platform cannot change: a
+   * {@code platform} other than the automation's is a
+   * {@code 400 platform_immutable}. A {@code completed} automation starts
+   * again when its limits or trigger change. Requires the
+   * {@code automations:write} scope. {@code 400 no_fields} when the body is
+   * empty.
    */
   public JsonNode update(String id, Map<String, Object> params) {
     return client.patch("/automations/" + seg(id), params);
@@ -114,7 +129,8 @@ public final class AutomationsResource extends ApiResource {
    * {@code counts} is the number of events per outcome (an outcome with no
    * events is left out). Each event carries {@code kind} ({@code comment},
    * {@code dm}, {@code story_reply}), {@code outcome}, {@code reason} /
-   * {@code reason_label}, {@code person} ({@code id}, {@code username}),
+   * {@code reason_label}, {@code person} ({@code id}, {@code username}; on
+   * Facebook the person's name, since Facebook has no @handle),
    * {@code trigger_id}, {@code trigger_text}, {@code message} (the DM sent),
    * {@code public_reply}, {@code platform_message_id}, {@code created_at}
    * and {@code sent_at}.
