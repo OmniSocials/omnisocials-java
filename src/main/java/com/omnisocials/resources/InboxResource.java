@@ -159,9 +159,8 @@ public final class InboxResource extends ApiResource {
    * fails. This can throw an {@link com.omnisocials.errors.ApiException} with
    * status 402 and code {@code insufficient_credits} (the balance can't cover
    * the 2 credits) or {@code x_inbox_suspended} (the workspace's X inbox was
-   * auto-suspended after hitting a zero balance; top up and re-enable it in
-   * the dashboard to resume - DMs that arrived while suspended are not
-   * recovered). Replies on other platforms are free. TikTok replies are
+   * auto-suspended after hitting a zero balance; a top-up turns it back on
+   * by itself, but DMs that arrived while suspended are not recovered). Replies on other platforms are free. TikTok replies are
    * comments only, text-only, and capped at 150 characters. YouTube replies
    * are comments only (YouTube has no DMs).
    *

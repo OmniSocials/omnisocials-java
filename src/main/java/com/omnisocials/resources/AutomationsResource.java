@@ -11,6 +11,10 @@ import java.util.Map;
  * story reply) with a DM, once per person, with an optional public reply under
  * the comment. With {@code platform} {@code facebook} it runs on a Facebook
  * Page instead, and the DM lands in Messenger (a Page has no story replies).
+ * With {@code platform} {@code x} it answers a keyword in a DM to the X
+ * account ({@code dm} kind only, no post, no public reply) while X DMs are on
+ * for the workspace; every X answer ends with "Reply STOP to stop automatic
+ * messages." and a person who replies STOP gets no automatic DM again.
  * The scopes are opt-in on the API key: {@code automations:read}
  * for list / get / listEvents, {@code automations:write} for create / update /
  * delete (and for {@code comment_dm_automation} on
@@ -34,7 +38,7 @@ public final class AutomationsResource extends ApiResource {
    * {@code GET /automations?status=&platform=&post_id=} - list with filters.
    * Query params: {@code status} ({@code active} | {@code paused} |
    * {@code completed}), {@code platform} ({@code instagram} |
-   * {@code facebook}), {@code post_id} (only the automations bound to that
+   * {@code facebook} | {@code x}), {@code post_id} (only the automations bound to that
    * OmniSocials post). Requires the {@code automations:read} scope.
    */
   public JsonNode list(Map<String, Object> query) {
@@ -53,8 +57,14 @@ public final class AutomationsResource extends ApiResource {
    * {@code POST /automations} - create a comment-to-DM automation.
    * {@code platform} is {@code instagram} (default) or {@code facebook}: on a
    * Facebook Page a keyword in a comment (or a Messenger message to the Page)
-   * is answered in Messenger, and a Page has no story replies. Bind it to one
-   * post with {@code post_id} (an OmniSocials post that goes to the channel,
+   * is answered in Messenger, and a Page has no story replies.
+   * {@code platform} {@code x} answers a keyword in a DM to the X account:
+   * {@code trigger.kinds} must be {@code ["dm"]} (X allows an automated DM
+   * only after the person wrote first), with no post and no public reply; an
+   * active X automation needs X DMs on for the workspace
+   * ({@code 409 x_dms_off}; {@code status} {@code paused} always saves), and
+   * every X answer ends with "Reply STOP to stop automatic messages.". Bind
+   * it to one post with {@code post_id} (an OmniSocials post that goes to the channel,
    * scheduled or live; one automation per post and platform),
    * {@code instagram_media_id} (an Instagram post published outside
    * OmniSocials) or {@code facebook_post_id} (a Page post published outside
@@ -75,7 +85,8 @@ public final class AutomationsResource extends ApiResource {
    * optional). {@code status} is {@code active} (default) or {@code paused}.
    * Meta rules, the same on Instagram and Facebook: one private reply per
    * comment, within 7 days; OmniSocials caps sends at 180 DMs an hour per
-   * account and platform.
+   * account and platform, and on X at 15 per 15 minutes and 450 a day; an
+   * answer over a cap waits in a queue ({@code queued}) for up to an hour.
    *
    * <p>Requires the {@code automations:write} scope (opt-in on the API key).
    * Errors: {@code 400 validation_error}, {@code 400 post_not_instagram},
@@ -83,8 +94,9 @@ public final class AutomationsResource extends ApiResource {
    * {@code 404 post_not_found}, {@code 404 instagram_media_not_found},
    * {@code 404 facebook_post_not_found}, {@code 409 instagram_not_connected},
    * {@code 409 instagram_needs_reauth}, {@code 409 facebook_not_connected},
-   * {@code 409 facebook_needs_reauth}, {@code 409 automation_exists} (the
-   * error body also carries {@code automation_id}).
+   * {@code 409 facebook_needs_reauth}, {@code 409 x_not_connected},
+   * {@code 409 x_dms_off}, {@code 409 automation_exists} (the error body
+   * also carries {@code automation_id}).
    */
   public JsonNode create(Map<String, Object> params) {
     return client.post("/automations", params);
@@ -102,8 +114,10 @@ public final class AutomationsResource extends ApiResource {
    * {@code post_id} / {@code instagram_media_id} / {@code facebook_post_id}
    * moves the automation to that post. The platform cannot change: a
    * {@code platform} other than the automation's is a
-   * {@code 400 platform_immutable}. A {@code completed} automation starts
-   * again when its limits or trigger change. Requires the
+   * {@code 400 platform_immutable}. {@code status: "active"} on an X
+   * automation needs X DMs on for the workspace ({@code 409 x_dms_off}). A
+   * {@code completed} automation starts again when its limits or trigger
+   * change. Requires the
    * {@code automations:write} scope. {@code 400 no_fields} when the body is
    * empty.
    */
@@ -128,8 +142,12 @@ public final class AutomationsResource extends ApiResource {
    * counts: { sent: 12, skipped: 3 }, pagination: {...} }}, where
    * {@code counts} is the number of events per outcome (an outcome with no
    * events is left out). Each event carries {@code kind} ({@code comment},
-   * {@code dm}, {@code story_reply}), {@code outcome}, {@code reason} /
-   * {@code reason_label}, {@code person} ({@code id}, {@code username}; on
+   * {@code dm}, {@code story_reply}), {@code outcome} (also {@code queued}:
+   * waits for a free slot under the send cap, out within the hour; and
+   * {@code opted_out}: the person replied STOP on X), {@code reason} /
+   * {@code reason_label} (X adds the skip reasons {@code dms_closed},
+   * {@code no_credits}, {@code opted_out} and {@code automation_off}),
+   * {@code person} ({@code id}, {@code username}; on
    * Facebook the person's name, since Facebook has no @handle),
    * {@code trigger_id}, {@code trigger_text}, {@code message} (the DM sent),
    * {@code public_reply}, {@code platform_message_id}, {@code created_at}
@@ -142,7 +160,8 @@ public final class AutomationsResource extends ApiResource {
   /**
    * {@code GET /automations/:id/events?outcome=&limit=&offset=} - the
    * activity with filters. Query params: {@code outcome} ({@code sent} |
-   * {@code skipped} | {@code failed} | {@code pending}), {@code limit} (1 to
+   * {@code skipped} | {@code failed} | {@code pending} | {@code queued} |
+   * {@code opted_out}), {@code limit} (1 to
    * 100, default 25), {@code offset}. See {@link #listEvents(String)} for the
    * response shape ({@code data}, {@code counts}, {@code pagination}).
    */

@@ -165,9 +165,11 @@ for (JsonNode event : events.get("data")) {
 }
 ```
 
-The events response is `data`, `counts` and `pagination`, not the plain list: `counts` is the number of events per outcome (`sent`, `skipped`, `failed`, `pending`). An automation can also listen on a post published outside OmniSocials (`client.automations().create(...)` with `instagram_media_id`), on the next post the workspace publishes (`trigger` with `scope` `next_post`) or on every post (`scope` `any`), and on DMs and story replies (`kinds` `["dm", "story_reply"]`).
+The events response is `data`, `counts` and `pagination`, not the plain list: `counts` is the number of events per outcome (`sent`, `skipped`, `failed`, `pending`, `queued`, `opted_out`). An automation can also listen on a post published outside OmniSocials (`client.automations().create(...)` with `instagram_media_id`), on the next post the workspace publishes (`trigger` with `scope` `next_post`) or on every post (`scope` `any`), and on DMs and story replies (`kinds` `["dm", "story_reply"]`).
 
 A Facebook Page works the same way, and the DM lands in Messenger: put `platform` `facebook` in the `client.automations().create(...)` params, or `facebook_post_id` for a Page post published outside OmniSocials. On a post, `platforms` `["instagram", "facebook"]` inside `comment_dm_automation` makes one automation per channel with the same keywords and DM. Facebook has no story replies.
+
+On X, put `platform` `x` and `trigger` `Map.of("kinds", List.of("dm"), "keywords", List.of("guide"))` in the create params: the X account answers a keyword in a DM, once per person, and every answer ends with "Reply STOP to stop automatic messages." An active X automation needs X DMs on for the workspace (`409 x_dms_off`; `status` `paused` always saves). An answer over the send cap waits in a queue (`queued`) for up to an hour.
 
 ### Publish immediately
 
@@ -674,14 +676,14 @@ try {
   if (e.getStatus() == 402 && "insufficient_credits".equals(e.getCode())) {
     System.err.println("Not enough credits to send this reply; top up in the dashboard.");
   } else if (e.getStatus() == 402 && "x_inbox_suspended".equals(e.getCode())) {
-    System.err.println("This workspace's X inbox is suspended at zero balance; top up and re-enable it.");
+    System.err.println("This workspace's X inbox is suspended at zero balance until a top-up.");
   } else {
     throw e;
   }
 }
 ```
 
-A workspace's X inbox is automatically suspended once its credit balance hits zero; DMs that arrive while suspended are not recovered, so top up and re-enable it in the dashboard (Settings -> Organisation -> Billing -> Credits) as soon as possible. Replies on Instagram, Facebook, LinkedIn, TikTok, and YouTube stay free.
+A workspace's X inbox is automatically suspended once its credit balance hits zero; DMs that arrive while suspended are not recovered, so top up in the dashboard (Settings -> Organisation -> Billing -> Credits) as soon as possible; the top-up turns the inbox back on by itself. Replies on Instagram, Facebook, LinkedIn, TikTok, and YouTube stay free.
 
 ## Webhooks
 
