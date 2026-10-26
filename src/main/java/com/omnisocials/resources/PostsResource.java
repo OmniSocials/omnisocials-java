@@ -75,6 +75,11 @@ public final class PostsResource extends ApiResource {
    * {@code validation_error} asking you to reconnect Threads when the
    * connection lacks the {@code threads_location_tagging} permission).
    *
+   * <p>Threads posts can carry a topic: {@code topic_tag} inside the
+   * {@code threads} map, for example "Build in public" (1 to 50 characters,
+   * no period and no ampersand; a topic can hold spaces). On a multi-post
+   * thread it goes on part 1; on update an explicit {@code null} removes it.
+   *
    * <p>Pinterest posts can tag products: {@code product_tags} inside the
    * {@code pinterest} map takes up to 24 product Pins of the connected
    * Pinterest account, each as a Pin id string (see
