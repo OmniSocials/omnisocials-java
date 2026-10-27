@@ -36,10 +36,17 @@ import java.util.Map;
  *       {@code platform}, {@code type}, {@code direction}, {@code text},
  *       {@code timestamp}, {@code is_read}, {@code is_replied},
  *       {@code reaction}, {@code parent_comment_id}, {@code sender},
- *       {@code post}, {@code hidden}, {@code permalink}). {@code hidden} is
- *       set on comments and mentions: {@code true} when the comment is
- *       hidden on the platform (see {@link #hide(String, boolean)}),
- *       {@code false} when it is not; JSON {@code null} for DMs.
+ *       {@code post}, {@code hidden}, {@code liked}, {@code permalink}).
+ *       {@code hidden} is set on comments and mentions: {@code true} when
+ *       the comment is hidden on the platform (see
+ *       {@link #hide(String, boolean)}), {@code false} when it is not; JSON
+ *       {@code null} for DMs. {@code liked} is set on Facebook, LinkedIn
+ *       Page and TikTok comments: {@code true} when the connected account
+ *       liked the comment (see {@link #like(String, boolean)}),
+ *       {@code false} when it did not (on Facebook and LinkedIn it reflects
+ *       likes made through OmniSocials; TikTok also syncs likes made in the
+ *       TikTok app); JSON {@code null} where the platform has no like
+ *       through OmniSocials (DMs, Instagram, YouTube, X, Threads).
  *       {@code permalink} links to the reply or mentioning post on the
  *       platform, when known ({@code null} otherwise).
  *   <li><b>InboxParticipant</b> ({@code id}, {@code name}, {@code username},
@@ -248,6 +255,43 @@ public final class InboxResource extends ApiResource {
   }
 
   /**
+   * {@code POST /inbox/messages/:messageId/like} - like a comment someone
+   * left on one of the user's posts, as the connected Page or account.
+   * Equivalent to {@link #like(String, boolean)} with {@code like} =
+   * {@code true}. Returns the comment after the change as
+   * {@code { data: InboxMessage }} with its {@code liked} flag set.
+   *
+   * <p>Facebook Page, LinkedIn Page and TikTok comments (incoming comments
+   * only). Facebook allows only Like (no Love or other reactions). Liking a
+   * comment that is already liked, or unliking one that is not, succeeds.
+   * Requires the {@code inbox:write} scope.
+   *
+   * <p>Errors: 400 {@code unsupported_platform} (not an incoming Facebook,
+   * LinkedIn or TikTok comment), 401 {@code reauth_required} (the TikTok
+   * comments authorization is missing or expired, or the LinkedIn Page connection expired), 403
+   * {@code reconnect_required} (the account was connected without the
+   * permission to like comments; reconnect it in the dashboard), 404
+   * {@code not_found} (message not in this workspace) or
+   * {@code account_not_connected}, 502 {@code platform_error} (the platform
+   * rejected the call).
+   *
+   * <p>{@code messageId} is URL-encoded for you.
+   */
+  public JsonNode like(String messageId) {
+    return client.post("/inbox/messages/" + seg(messageId) + "/like");
+  }
+
+  /**
+   * {@code POST /inbox/messages/:messageId/like} - like ({@code like} =
+   * {@code true}) or unlike ({@code like} = {@code false}) a comment someone
+   * left on one of the user's posts. See {@link #like(String)} for the
+   * platforms, rules and error codes.
+   */
+  public JsonNode like(String messageId, boolean like) {
+    return client.post("/inbox/messages/" + seg(messageId) + "/like", Map.of("like", like));
+  }
+
+  /**
    * {@code DELETE /inbox/messages/:messageId} - delete a comment someone left
    * on one of the user's posts, on the platform and from the inbox. Facebook,
    * Instagram and TikTok comments only: YouTube's API does not let a channel
@@ -318,8 +362,8 @@ public final class InboxResource extends ApiResource {
    * {@code data} is {@code { conversation, message, messages, reply_window }},
    * or JSON {@code null} when nothing is waiting. {@code message} is the
    * unanswered incoming item itself (the customer's latest DM, or the
-   * specific comment): its {@code id} is what {@link #hide(String)} and
-   * {@link #deleteMessage(String)} take and the {@code message_id} to pass
+   * specific comment): its {@code id} is what {@link #hide(String)},
+   * {@link #like(String)} and {@link #deleteMessage(String)} take and the {@code message_id} to pass
    * to {@link #reply(String, Map)} on comment threads, its
    * {@code conversation_id} is what {@link #reply(String, Map)} takes.
    * {@code messages} is the conversation so far, oldest first (the most

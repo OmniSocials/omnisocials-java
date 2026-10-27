@@ -17,14 +17,14 @@ Maven:
 <dependency>
   <groupId>com.omnisocials</groupId>
   <artifactId>omnisocials-java</artifactId>
-  <version>0.12.0</version>
+  <version>0.13.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation "com.omnisocials:omnisocials-java:0.12.0"
+implementation "com.omnisocials:omnisocials-java:0.13.0"
 ```
 
 ## Quickstart
@@ -633,9 +633,15 @@ String messageId = conversations.get("data").get(0).get("last_message").get("id"
 client.inbox().hide(messageId);        // hide
 client.inbox().hide(messageId, false); // unhide
 client.inbox().deleteMessage(messageId);
+
+// Like or unlike a comment as the Page or account (Facebook, LinkedIn Page,
+// TikTok). The returned message carries its liked flag.
+JsonNode liked = client.inbox().like(messageId); // like
+client.inbox().like(messageId, false);           // unlike
+System.out.println(liked.get("data").get("liked").asBoolean()); // true
 ```
 
-Conversation and message lists use cursor pagination (`pagination.next_cursor` / `pagination.has_more`), not the offset pagination used elsewhere in this API. `platform` accepts `instagram`, `facebook`, `linkedin`, `tiktok`, `youtube`, `x`, or `threads`; a message's `direction` is `"incoming"` or `"outgoing"`. Threads conversations are comments (replies people leave on your Threads posts) and mentions; there are no Threads DMs. Comments can be hidden on Facebook, Instagram, TikTok, YouTube, and Threads (Threads: incoming top-level replies only), and a hidden message keeps its place in the conversation with its `hidden` flag set; `hidden` is `true`/`false` on comments and JSON `null` on DMs. A comment/mention's `post` carries `url` (public link when the platform provides one) and `media_type` (the platform's own label) next to `id`, `caption`, and `thumbnail`. The Threads inbox needs a Threads connection with the reply permission (a 401 `reauth_required` means reconnect Threads; an account connected before 2026-09-14 needs this once). TikTok and YouTube replies are comments only; TikTok replies are capped at 150 characters.
+Conversation and message lists use cursor pagination (`pagination.next_cursor` / `pagination.has_more`), not the offset pagination used elsewhere in this API. `platform` accepts `instagram`, `facebook`, `linkedin`, `tiktok`, `youtube`, `x`, or `threads`; a message's `direction` is `"incoming"` or `"outgoing"`. Threads conversations are comments (replies people leave on your Threads posts) and mentions; there are no Threads DMs. Comments can be hidden on Facebook, Instagram, TikTok, YouTube, and Threads (Threads: incoming top-level replies only), and a hidden message keeps its place in the conversation with its `hidden` flag set; `hidden` is `true`/`false` on comments and JSON `null` on DMs. `liked` is `true`/`false` on Facebook, LinkedIn Page, and TikTok comments (whether the connected account liked it; on Facebook and LinkedIn it reflects likes made through OmniSocials, TikTok also syncs likes made in the TikTok app) and JSON `null` where the platform has no like through OmniSocials (DMs, Instagram, YouTube, X, Threads). A comment/mention's `post` carries `url` (public link when the platform provides one) and `media_type` (the platform's own label) next to `id`, `caption`, and `thumbnail`. The Threads inbox needs a Threads connection with the reply permission (a 401 `reauth_required` means reconnect Threads; an account connected before 2026-09-14 needs this once). TikTok and YouTube replies are comments only; TikTok replies are capped at 150 characters.
 
 ### Work queue: what needs an answer
 
