@@ -36,12 +36,37 @@ public final class AnalyticsResource extends ApiResource {
   }
 
   /**
-   * {@code GET /analytics/overview?period=&start_date=&end_date=} - workspace
-   * totals for a period ({@code 7d}, {@code 30d}, {@code 90d}, or a custom
-   * {@code start_date}/{@code end_date} range).
+   * {@code GET /analytics/overview?period=&start_date=&end_date=&tag=} -
+   * workspace totals for a period ({@code 7d}, {@code 30d}, {@code 90d}, or a
+   * custom {@code start_date}/{@code end_date} range). {@code tag} (a tag id
+   * or name, comma separated for any of several) limits the post numbers to
+   * the posts with that tag; account numbers stay those of the whole account.
    */
   public JsonNode overview(Map<String, Object> query) {
     return client.get("/analytics/overview", query);
+  }
+
+  /**
+   * {@code GET /analytics/tags} - how each post tag did against your normal
+   * over the last 90 days. Returns {@code { data: { period, platform,
+   * min_posts, tags, untagged, normals } }}: {@code tags} is a list of
+   * comparisons (comparable first, best first), each with {@code tag},
+   * {@code posts}, {@code measured}, {@code median_impressions},
+   * {@code engagement_rate} (percent), {@code vs_normal} (a fraction, 0.38 =
+   * 38% above normal), {@code best_channel} and {@code enough_posts}.
+   */
+  public JsonNode tags() {
+    return client.get("/analytics/tags");
+  }
+
+  /**
+   * {@code GET /analytics/tags?start_date=&end_date=&platform=&min_posts=} -
+   * {@link #tags()} for a period ("YYYY-MM-DD", "YYYY-MM" or ISO 8601), one
+   * channel, and the measured posts a tag needs before {@code enough_posts}
+   * is true (default 5, 1 to 50).
+   */
+  public JsonNode tags(Map<String, Object> query) {
+    return client.get("/analytics/tags", query);
   }
 
   /** {@code GET /analytics/accounts} - account-level stats (followers etc). */

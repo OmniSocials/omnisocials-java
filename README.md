@@ -493,6 +493,48 @@ client.posts().create(Params.builder()
     .build());
 ```
 
+## Post tags
+
+Tags are your workspace's own labels for posts (a hook style, a format), to filter and compare posts in Analytics. They never go to a platform. Uses the `posts:read` / `posts:write` scopes; the comparison uses `analytics:read`.
+
+```java
+JsonNode tag = client.tags().create(Params.of("name", "Question", "color", "blue")); // color optional
+long tagId = tag.get("data").get("id").asLong();
+
+client.tags().list();
+client.tags().update(tagId, Params.of("name", "Question hook")); // name and/or color
+client.tags().delete(tagId); // { data: { tag, posts_untagged } }, the posts stay
+
+// Tag up to 500 posts at once, published ones included. Items are tag ids or names;
+// a new name in add or set becomes a tag. set replaces a post's tags.
+JsonNode applied = client.tags().apply(Params.builder()
+    .put("post_ids", List.of("1024", "1025"))
+    .put("add", List.of("Question"))
+    .put("remove", List.of(tagId))
+    .build());
+System.out.println(applied.get("data").get("not_found")); // ids that are not posts of this workspace
+
+// Set tags on a post (ids or names, at most 20). On update, null or an empty list removes them.
+client.posts().create(Params.builder()
+    .put("content", "Would you post this?")
+    .put("channels", List.of("tiktok"))
+    .put("tags", List.of("Question", "Talking head"))
+    .build());
+client.posts().update(postId, Params.of("tags", List.of("Question"))); // works on published posts too
+
+// Filter by tag (an id or name, comma separated = any of them)
+client.posts().list(Params.of("tag", "Question"));
+client.analytics().overview(Params.of("period", "30d", "tag", "Question"));
+
+// How each tag did against your normal (default: the last 90 days)
+JsonNode compare = client.analytics().tags(Params.of("platform", "tiktok", "min_posts", 5));
+for (JsonNode row : compare.get("data").get("tags")) {
+  System.out.println(row.get("tag").get("name").asText() + " " + row.get("vs_normal")); // 0.38 = 38% above
+}
+```
+
+Each post carries `tags` (the tag objects) and `trial_reel` (`{ "strategy": "MANUAL" | "SS_PERFORMANCE" }` for an Instagram Trial Reel, else `null`); `analytics().posts(ids)` items carry both too. Error codes: `tag_not_found` (404), `tag_exists` (409, the existing tag is in `error.tag`), `tag_limit_reached` (409, at most 200 tags per workspace), `invalid_tag_name`, `invalid_tag_color`, `invalid_tags`, `invalid_post_ids`, `too_many_posts`, `too_many_tags` (400).
+
 ## Accounts
 
 ```java

@@ -20,6 +20,7 @@ import com.omnisocials.resources.LocationsResource;
 import com.omnisocials.resources.MediaResource;
 import com.omnisocials.resources.PinterestResource;
 import com.omnisocials.resources.PostsResource;
+import com.omnisocials.resources.TagsResource;
 import com.omnisocials.resources.WebhooksResource;
 import java.io.IOException;
 import java.net.URI;
@@ -87,6 +88,7 @@ public final class OmniSocials {
   private final MediaResource media;
   private final FoldersResource folders;
   private final HashtagSetsResource hashtagSets;
+  private final TagsResource tags;
   private final ApprovalWorkflowsResource approvalWorkflows;
   private final AccountsResource accounts;
   private final AnalyticsResource analytics;
@@ -112,6 +114,7 @@ public final class OmniSocials {
     this.media = new MediaResource(this);
     this.folders = new FoldersResource(this);
     this.hashtagSets = new HashtagSetsResource(this);
+    this.tags = new TagsResource(this);
     this.approvalWorkflows = new ApprovalWorkflowsResource(this);
     this.accounts = new AccountsResource(this);
     this.analytics = new AnalyticsResource(this);
@@ -149,6 +152,10 @@ public final class OmniSocials {
 
   public HashtagSetsResource hashtagSets() {
     return hashtagSets;
+  }
+
+  public TagsResource tags() {
+    return tags;
   }
 
   public ApprovalWorkflowsResource approvalWorkflows() {

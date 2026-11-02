@@ -21,6 +21,8 @@ public final class PostsResource extends ApiResource {
    * Query params: {@code status} (draft | in_approval | scheduled | posting |
    * published | failed | warning; in_approval = waiting for a reviewer in an
    * approval workflow), {@code limit}, {@code offset}.
+   * {@code tag}: only posts with this tag (a tag id or name, comma separated
+   * for any of several; an unknown tag is 404 {@code tag_not_found}).
    */
   public JsonNode list(Map<String, Object> query) {
     return client.get("/posts", query);
@@ -200,6 +202,13 @@ public final class PostsResource extends ApiResource {
    * {@code post} null, plus {@code platforms} and {@code automations}, one
    * {@code id} / {@code platform} / {@code status} per channel); each starts
    * listening once the post is live on its channel.
+   *
+   * <p>{@code tags}: a list of tag ids or names (at most 20); a name that
+   * does not exist yet becomes a tag of the workspace. Tags are the
+   * workspace's own labels to filter and compare posts, never sent to a
+   * platform; see {@link TagsResource}. The post carries {@code tags} (the
+   * tag objects) and {@code trial_reel} ({@code { strategy }} for an
+   * Instagram Trial Reel, else {@code null}).
    */
   public JsonNode create(Map<String, Object> params) {
     return client.post("/posts/create", params);
@@ -259,6 +268,12 @@ public final class PostsResource extends ApiResource {
    * {@code null} ({@code Params.of("poll", null)}) removes that option, an
    * explicit {@code null} for {@code discord} removes every option, and
    * omitting the key leaves them untouched.
+   *
+   * <p>{@code tags} (tag ids or names) replaces the post's tags; an explicit
+   * {@code null} or an empty list removes them all. An update that sends
+   * only {@code tags} works on every post, published ones included. To
+   * change a few tags on many posts at once, use
+   * {@link TagsResource#apply(Map)}.
    */
   public JsonNode update(String id, Map<String, Object> params) {
     return client.patch("/posts/" + seg(id), params);

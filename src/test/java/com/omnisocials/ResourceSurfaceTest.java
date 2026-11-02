@@ -13,6 +13,7 @@ import com.omnisocials.resources.LocationsResource;
 import com.omnisocials.resources.MediaResource;
 import com.omnisocials.resources.PinterestResource;
 import com.omnisocials.resources.PostsResource;
+import com.omnisocials.resources.TagsResource;
 import com.omnisocials.resources.WebhooksResource;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -65,6 +66,11 @@ class ResourceSurfaceTest {
   }
 
   @Test
+  void tagsSurface() {
+    assertHasMethods(TagsResource.class, "list", "create", "update", "delete", "apply");
+  }
+
+  @Test
   void accountsSurface() {
     assertHasMethods(AccountsResource.class, "list", "get");
   }
@@ -72,7 +78,7 @@ class ResourceSurfaceTest {
   @Test
   void analyticsSurface() {
     assertHasMethods(
-        AnalyticsResource.class, "post", "posts", "overview", "accounts", "bestTimes");
+        AnalyticsResource.class, "post", "posts", "overview", "accounts", "bestTimes", "tags");
   }
 
   @Test
@@ -112,6 +118,7 @@ class ResourceSurfaceTest {
     assertNotNull(client.media());
     assertNotNull(client.folders());
     assertNotNull(client.hashtagSets());
+    assertNotNull(client.tags());
     assertNotNull(client.accounts());
     assertNotNull(client.analytics());
     assertNotNull(client.locations());
