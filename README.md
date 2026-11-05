@@ -17,14 +17,14 @@ Maven:
 <dependency>
   <groupId>com.omnisocials</groupId>
   <artifactId>omnisocials-java</artifactId>
-  <version>0.14.0</version>
+  <version>0.15.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation "com.omnisocials:omnisocials-java:0.14.0"
+implementation "com.omnisocials:omnisocials-java:0.15.0"
 ```
 
 ## Quickstart
@@ -71,7 +71,7 @@ OmniSocials client = OmniSocials.builder()
     .build();
 ```
 
-Retries use exponential backoff (0.5s, 1s, 2s, ...) with jitter and honor the `Retry-After` header. Other 4xx responses are never retried.
+Retries use exponential backoff (0.5s, 1s, 2s, ...) with jitter and honor the `Retry-After` header. Other 4xx responses are never retried. A call that can start or raise ad spend is retried on a 429 only (see [Ads](#ads)).
 
 ## Rate limits
 
@@ -165,7 +165,18 @@ for (JsonNode event : events.get("data")) {
 }
 ```
 
-The events response is `data`, `counts` and `pagination`, not the plain list: `counts` is the number of events per outcome (`sent`, `skipped`, `failed`, `pending`, `queued`, `opted_out`). An automation can also listen on a post published outside OmniSocials (`client.automations().create(...)` with `instagram_media_id`), on the next post the workspace publishes (`trigger` with `scope` `next_post`) or on every post (`scope` `any`), and on DMs and story replies (`kinds` `["dm", "story_reply"]`).
+The events response is `data`, `counts` and `pagination`, not the plain list: `counts` is the number of events per outcome (`sent`, `skipped`, `failed`, `pending`, `queued`, `opted_out`, `waiting`). An automation can also listen on a post published outside OmniSocials (`client.automations().create(...)` with `instagram_media_id`), on the next post the workspace publishes (`trigger` with `scope` `next_post`) or on every post (`scope` `any`), and on DMs and story replies (`kinds` `["dm", "story_reply"]`).
+
+Follow first (`follow_gate` in the actions, Instagram only) sends the link only to people who follow the account. On a comment the private reply is a first message with one button; a tap makes OmniSocials ask Instagram whether the person follows. A follower gets the DM text, anyone else gets the `not_following` message with its button, and every later tap checks again. A DM or a story reply is checked at once. When Instagram gives no answer the link goes out anyway. Texts hold 640 characters and buttons 20; leave them out for the defaults. A person who has not followed yet is an event with outcome `waiting` and a `follow_gate` object (`state`, `taps`, `followed`, `checked`, `after_ask`); `stats.followed` counts the people who followed after the ask. `enabled` `true` on a Facebook or X automation is a `400 follow_gate_instagram_only`.
+
+```java
+client.automations().update(automationId, Params.of("actions", Params.of(
+    "dm", Params.of("text", "Here is the guide: https://example.com/guide"),
+    "follow_gate", Params.of(
+        "enabled", true,
+        "first_message", Params.of("text", "Tap the button and I'll send you the link 👇", "button", "Send me the link"),
+        "not_following", Params.of("text", "Almost there! Follow @yourbrand first, then tap the button again.", "button", "I follow now")))));
+```
 
 A Facebook Page works the same way, and the DM lands in Messenger: put `platform` `facebook` in the `client.automations().create(...)` params, or `facebook_post_id` for a Page post published outside OmniSocials. On a post, `platforms` `["instagram", "facebook"]` inside `comment_dm_automation` makes one automation per channel with the same keywords and DM. Facebook has no story replies.
 
@@ -674,6 +685,7 @@ client.inbox().reply(conversationId, Params.of("text", "Thanks for reaching out!
 String messageId = conversations.get("data").get(0).get("last_message").get("id").asText();
 client.inbox().hide(messageId);        // hide
 client.inbox().hide(messageId, false); // unhide
+// Delete a comment, or one of your own replies (Facebook, Instagram, TikTok).
 client.inbox().deleteMessage(messageId);
 
 // Like or unlike a comment as the Page or account (Facebook, LinkedIn Page,
@@ -735,9 +747,73 @@ try {
 
 A workspace's X inbox is automatically suspended once its credit balance hits zero; DMs that arrive while suspended are not recovered, so top up in the dashboard (Settings -> Organisation -> Billing -> Credits) as soon as possible; the top-up turns the inbox back on by itself. Replies on Instagram, Facebook, LinkedIn, TikTok, and YouTube stay free.
 
+## Ads
+
+Boost a published post or create a new ad on Meta, Pinterest, TikTok, LinkedIn, X and Google. Ads spend real money, so every call that starts or raises spend asks for the amount again: `ads().activate()`, `ads().activateMulti()`, `ads().drafts().launch()` and a budget raise through `ads().update()`. Show the person the amount first and pass it only after they agree. These calls and `ads().resume()` are not retried after a 5xx or a timeout, because the first attempt may have started the ad: read the campaign or the draft to see what happened. A 429 is still retried.
+
+The `ads:read` and `ads:write` scopes are opt-in: create the API key with **Ads** switched on (Settings, API). A key without them gets a `PermissionDeniedException` with code `insufficient_scope`. Ad accounts are connected and picked in the OmniSocials dashboard. Budgets are in major units (10 = 10 EUR) in the ad account's currency.
+
+### Create an ad (draft, then launch)
+
+```java
+JsonNode caps = client.ads().capabilities().get("data");
+System.out.println(caps.get("create_networks") + " " + caps.get("network_states"));
+
+JsonNode draft = client.ads().drafts().create(Params.builder()
+    .put("name", "Autumn sale")
+    .put("objective", "traffic")
+    .put("platforms", List.of("meta", "linkedin"))
+    .put("budget", Params.of("amount", 10, "currency", "EUR"))
+    .put("schedule", Params.of("duration_days", 7))
+    .put("targeting", Params.of("countries", List.of("NL", "BE"), "automatic_audience", true))
+    .put("ads", List.of(Params.builder()
+        .put("media", List.of(Params.of(
+            "url", "https://example.com/sale.jpg", "type", "image", "width", 1080, "height", 1350)))
+        .put("primary_text", "30% off everything this week")
+        .put("headline", "Autumn sale")
+        .put("cta", "shop_now")
+        .put("link", "https://example.com/sale")
+        .build()))
+    .build()).get("data");
+
+// A draft spends nothing. Hand draft.review_url to the person, or start it
+// after they confirmed 10 EUR a day per network:
+JsonNode launch = client.ads().drafts().launch(draft.get("group_id").asText(), 10).get("data");
+for (JsonNode result : launch.get("results")) {
+  System.out.println(result.get("platform").asText() + " "
+      + (result.get("ok").asBoolean() ? "started" : result.get("error").asText()));
+}
+```
+
+A draft needs no ad account; `client.ads().drafts().attachAccount(groupId, "meta", adAccountId)` sets one, and `campaigns[].readiness` says what still stops a network. To confirm a different daily amount per campaign, pass `Params.of("confirm_budget_amounts", Params.of("41", 10, "42", 20))` to `launch(groupId, params)`. `drafts().update(groupId, params)` replaces the whole draft (HTTP PUT). On Meta an ad can carry a second upright 9:16 file for Stories and Reels: `placement_media` with `stories_reels` (`url`, `type`).
+
+### Boost a post
+
+```java
+JsonNode meta = null;
+for (JsonNode account : client.ads().listAccounts().get("data")) {
+  if ("meta".equals(account.get("platform").asText()) && account.get("is_selected").asBoolean()) {
+    meta = account;
+  }
+}
+String currency = meta.path("account_info").path("currency").asText("EUR");
+
+JsonNode boost = client.ads().boost(Params.builder()
+    .put("post_id", 12345)
+    .put("ad_account_id", meta.get("id").asLong())
+    .put("budget", Params.of("type", "daily", "amount", 5, "currency", currency))
+    .put("targeting", Params.of("countries", List.of("NL")))
+    .build()).get("data");
+
+// The boost is a draft. Start it only after the person confirmed 5 a day:
+client.ads().activate(boost.get("id").asLong(), 5);
+```
+
+`client.ads().boostMulti(params)` makes one draft boost per ad account (`ad_account_ids`, up to 10, the same budget each). `suggestions()` lists posts that do better than your median, `overview()` the totals, and `list()`, `get(id)`, `pause(id)`, `resume(id)` and `delete(id)` manage campaigns. Keyword ideas through the connected Google Ads account: `researchKeywords(Params.of("keywords", List.of("running shoes"), "country", "NL"))` and `keywordMetrics(Params.of("keywords", List.of("running shoes", "trail shoes")))`.
+
 ## Webhooks
 
-Events: `post.scheduled`, `post.published`, `post.failed`, `post.approved` (the last step of a post's approval workflow is approved) and `post.rejected` (an approver rejects the post; it will not publish). The two approval events carry `data.approval` with `status`, `decided_by` (the approver's user id) and `reason` (null on `post.approved`), and an empty `data.targets`.
+Events: `post.scheduled`, `post.published`, `post.failed`, `post.approved` (the last step of a post's approval workflow is approved) and `post.rejected` (an approver rejects the post; it will not publish). The two approval events carry `data.approval` with `status`, `decided_by` (the approver's user id) and `reason` (null on `post.approved`), and an empty `data.targets`. `ad.status_changed` fires when an ad campaign changes status (for example `pending_review` to `active` or `rejected`); its `data` is the campaign, not a post: `campaign_id`, `workspace_id`, `name`, `platform`, `campaign_type`, `status`, `previous_status`, `external_campaign_id` and `budget`.
 
 ### Manage endpoints
 
@@ -807,6 +883,43 @@ public class OmniSocialsWebhookController {
 
 `Webhooks.verifySignature` uses a constant-time comparison (`MessageDigest.isEqual`), rejects timestamps older than the tolerance in seconds (replay protection, default 300), throws `WebhookVerificationException` on any failure, and returns the parsed event on success.
 
+## Limits and feature requests
+
+`client.limits().list()` lists what OmniSocials cannot do, why (`says`) and what to do instead (`instead`): platform rules, features not built yet, features that work in the OmniSocials app only. Read it before you tell a person that something is not possible. When the person still wants a `requestable` entry, send a feature request with its `limit_id`. The request is stored for the person who owns the key; they see it in OmniSocials (Settings, Request a feature) and get an email when its status changes. Works with every key, no scope needed.
+
+```java
+import com.omnisocials.errors.ApiException;
+
+JsonNode limits = client.limits().list(Params.of("platform", "telegram")); // "area": "posts", "inbox", ...
+for (JsonNode limit : limits.get("data")) {
+  System.out.println(limit.get("id").asText() + ": " + limit.get("says").asText()
+      + " requestable=" + limit.get("requestable").asBoolean());
+}
+
+try {
+  JsonNode result = client.featureRequests().create(Params.builder()
+      .put("summary", "Post our daily update to the Announcements topic of our Telegram group, not to the whole group.")
+      .put("platform", "telegram")
+      .put("limit_id", "telegram.forum_topics")
+      .build());
+  // "created" (new), "voted" (added a vote to your organisation's open request)
+  // or "already_requested" (you asked before; data is that request)
+  System.out.println(result.get("outcome").asText() + " " + result.get("data").get("id").asLong());
+} catch (ApiException e) {
+  if (!"not_requestable".equals(e.getCode())) {
+    throw e;
+  }
+  // A platform rule or a choice of OmniSocials: nothing was stored.
+  JsonNode limit = e.getBody().get("error").get("limit");
+  System.out.println(limit.get("says").asText() + " " + limit.get("instead").asText(""));
+}
+
+JsonNode mine = client.featureRequests().list(); // newest first, at most 50
+JsonNode one = client.featureRequests().get(mine.get("data").get(0).get("id").asLong()); // status, team_answer, team_replies
+```
+
+A limit is `{ id, kind, kind_label, area, platforms, title, says, instead, requestable }`; `kind` is `platform`, `by_design`, `not_built`, `beta`, `dashboard_only` or `needs_setup`, and `requestable` is false for `platform` and `by_design`. `limits().list()` also returns `kinds` (a label per kind). A request carries `status` (`open`, `in_progress`, `completed`, `declined`), `votes_count`, `team_answer` and `team_replies`. `summary` is 10 to 1000 characters (what the person wants to do and why), `title` at most 120 (made from the summary when left out); `area` is one of posts, media, inbox, analytics, automations, accounts, ads, team, other. Errors: `400 invalid_summary` / `invalid_title` / `invalid_platform` / `invalid_area` / `unknown_limit`, `409 not_requestable` (the entry is in `error.limit` of `getBody()`), `429 too_many_requests` (10 an hour per person), and `400 invalid_id` / `404 not_found` on `get`.
+
 ## Health
 
 ```java
@@ -847,7 +960,7 @@ try {
 
 ## API scopes
 
-Each API key carries scopes: `posts:read`, `posts:write`, `media:write`, `accounts:read`, `analytics:read`, `webhooks:manage`, plus the opt-in `automations:read` / `automations:write` for comment-to-DM automations. A call with a missing scope throws `PermissionDeniedException` with code `insufficient_scope`.
+Each API key carries scopes: `posts:read`, `posts:write`, `media:write`, `accounts:read`, `analytics:read`, `webhooks:manage`, plus the opt-in `automations:read` / `automations:write` for comment-to-DM automations and `ads:read` / `ads:write` for ads. A call with a missing scope throws `PermissionDeniedException` with code `insufficient_scope`.
 
 ## Documentation
 

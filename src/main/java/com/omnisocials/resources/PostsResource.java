@@ -17,12 +17,16 @@ public final class PostsResource extends ApiResource {
   }
 
   /**
-   * {@code GET /posts?status=&limit=&offset=} - list posts with filters.
-   * Query params: {@code status} (draft | in_approval | scheduled | posting |
-   * published | failed | warning; in_approval = waiting for a reviewer in an
-   * approval workflow), {@code limit}, {@code offset}.
-   * {@code tag}: only posts with this tag (a tag id or name, comma separated
-   * for any of several; an unknown tag is 404 {@code tag_not_found}).
+   * {@code GET /posts?status=&limit=&offset=&start_date=&end_date=} - list
+   * posts with filters. Query params: {@code status} (draft | in_approval |
+   * scheduled | posting | published | failed | warning; in_approval = waiting
+   * for a reviewer in an approval workflow), {@code limit}, {@code offset},
+   * {@code start_date} and {@code end_date} (posts whose {@code schedule_at}
+   * falls in the period, both inclusive: "YYYY-MM-DD" a UTC day, "YYYY-MM" a
+   * month, or an ISO 8601 datetime). With a range the posts come in calendar
+   * order (earliest first). {@code tag}: only posts with this tag (a tag id or
+   * name, comma separated for any of several; an unknown tag is 404
+   * {@code tag_not_found}).
    */
   public JsonNode list(Map<String, Object> query) {
     return client.get("/posts", query);
@@ -188,8 +192,10 @@ public final class PostsResource extends ApiResource {
    * comment is answered with a DM, once per person, with an optional public
    * reply under the comment. A map of {@code trigger} ({@code keywords},
    * {@code match}), {@code actions} ({@code dm} with {@code text}, optional
-   * {@code public_reply} with {@code enabled} and {@code variations}),
-   * {@code limits} ({@code max_sends}, {@code stop_at}) and
+   * {@code public_reply} with {@code enabled} and {@code variations},
+   * optional {@code follow_gate}, Follow first, which applies to the
+   * Instagram automation only), {@code limits} ({@code max_sends},
+   * {@code stop_at}) and
    * {@code platforms} ({@code ["instagram", "facebook"]}: one automation per
    * listed channel, each a channel of the post; without it Instagram when the
    * post goes there, else Facebook); see

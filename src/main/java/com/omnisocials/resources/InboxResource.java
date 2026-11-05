@@ -292,8 +292,9 @@ public final class InboxResource extends ApiResource {
   }
 
   /**
-   * {@code DELETE /inbox/messages/:messageId} - delete a comment someone left
-   * on one of the user's posts, on the platform and from the inbox. Facebook,
+   * {@code DELETE /inbox/messages/:messageId} - delete a comment on one of the
+   * user's posts, on the platform and from the inbox: a comment someone left,
+   * or one of the user's own replies (direction {@code outgoing}). Facebook,
    * Instagram and TikTok comments only: YouTube's API does not let a channel
    * delete other people's comments, hide those instead
    * ({@link #hide(String)}). Replies under the deleted comment go with it

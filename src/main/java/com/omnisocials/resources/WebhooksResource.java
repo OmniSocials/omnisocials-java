@@ -29,8 +29,13 @@ public final class WebhooksResource extends ApiResource {
   /**
    * {@code POST /webhooks} - register an endpoint for event deliveries
    * (post.scheduled, post.published, post.failed, post.approved,
-   * post.rejected). Params: {@code url}, {@code events}. The response
-   * includes the signing {@code secret}; save it, it is only shown once.
+   * post.rejected, ad.status_changed). Params: {@code url}, {@code events}.
+   * The {@code data} of an {@code ad.status_changed} delivery is the
+   * campaign, not a post: {@code campaign_id}, {@code workspace_id},
+   * {@code name}, {@code platform}, {@code campaign_type}, {@code status},
+   * {@code previous_status}, {@code external_campaign_id}, {@code budget}.
+   * The response includes the signing {@code secret}; save it, it is only
+   * shown once.
    */
   public JsonNode create(Map<String, Object> params) {
     return client.post("/webhooks", params);

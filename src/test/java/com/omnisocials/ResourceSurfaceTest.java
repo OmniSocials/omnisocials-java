@@ -4,11 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.omnisocials.resources.AccountsResource;
+import com.omnisocials.resources.AdDraftsResource;
+import com.omnisocials.resources.AdsResource;
 import com.omnisocials.resources.AnalyticsResource;
 import com.omnisocials.resources.AutomationsResource;
+import com.omnisocials.resources.FeatureRequestsResource;
 import com.omnisocials.resources.FoldersResource;
 import com.omnisocials.resources.HashtagSetsResource;
 import com.omnisocials.resources.InboxResource;
+import com.omnisocials.resources.LimitsResource;
 import com.omnisocials.resources.LocationsResource;
 import com.omnisocials.resources.MediaResource;
 import com.omnisocials.resources.PinterestResource;
@@ -98,6 +102,18 @@ class ResourceSurfaceTest {
   }
 
   @Test
+  void adsSurface() {
+    assertHasMethods(
+        AdsResource.class,
+        "drafts", "listAccounts", "capabilities", "list", "get", "boost", "boostMulti", "create",
+        "update", "activate", "activateMulti", "pause", "resume", "delete", "overview",
+        "suggestions", "researchKeywords", "keywordMetrics");
+    assertHasMethods(
+        AdDraftsResource.class,
+        "defaults", "create", "get", "update", "delete", "attachAccount", "launch");
+  }
+
+  @Test
   void inboxSurface() {
     assertHasMethods(
         InboxResource.class,
@@ -109,6 +125,16 @@ class ResourceSurfaceTest {
   void webhooksSurface() {
     assertHasMethods(
         WebhooksResource.class, "list", "get", "create", "update", "delete", "rotateSecret");
+  }
+
+  @Test
+  void limitsSurface() {
+    assertHasMethods(LimitsResource.class, "list");
+  }
+
+  @Test
+  void featureRequestsSurface() {
+    assertHasMethods(FeatureRequestsResource.class, "create", "list", "get");
   }
 
   @Test
@@ -124,8 +150,12 @@ class ResourceSurfaceTest {
     assertNotNull(client.locations());
     assertNotNull(client.pinterest());
     assertNotNull(client.automations());
+    assertNotNull(client.ads());
+    assertNotNull(client.ads().drafts());
     assertNotNull(client.inbox());
     assertNotNull(client.webhooks());
+    assertNotNull(client.limits());
+    assertNotNull(client.featureRequests());
     assertHasMethods(OmniSocials.class, "health", "fromEnv", "builder");
   }
 

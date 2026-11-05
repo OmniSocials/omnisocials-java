@@ -88,8 +88,23 @@ public final class AutomationsResource extends ApiResource {
    * account and platform, and on X at 15 per 15 minutes and 450 a day; an
    * answer over a cap waits in a queue ({@code queued}) for up to an hour.
    *
+   * <p>Follow first (Instagram only): {@code follow_gate} in {@code actions}
+   * (a map of {@code enabled}, {@code first_message} and
+   * {@code not_following}, each message a map of {@code text} and
+   * {@code button}) sends the link (the {@code dm} text) only to people who
+   * follow the account. A comment gets the first message as the private
+   * reply, with one button; a tap makes OmniSocials ask Instagram whether
+   * the person follows. A follower gets the link, anyone else gets the
+   * {@code not_following} message with its button, and every later tap
+   * checks again. A DM or a story reply is checked at once. When Instagram
+   * gives no answer the link goes out anyway. Texts hold 640 characters,
+   * buttons 20; a text or button left out is the default. {@code null} or
+   * {@code false} turns it off. The response carries the gate with its texts
+   * ({@code null} on Facebook and X) and {@code stats.followed}.
+   *
    * <p>Requires the {@code automations:write} scope (opt-in on the API key).
-   * Errors: {@code 400 validation_error}, {@code 400 post_not_instagram},
+   * Errors: {@code 400 validation_error},
+   * {@code 400 follow_gate_instagram_only}, {@code 400 post_not_instagram},
    * {@code 400 post_not_facebook}, {@code 400 post_required},
    * {@code 404 post_not_found}, {@code 404 instagram_media_not_found},
    * {@code 404 facebook_post_not_found}, {@code 409 instagram_not_connected},
@@ -109,7 +124,10 @@ public final class AutomationsResource extends ApiResource {
    * keep the kinds, the scope and the match; a new {@code actions.dm.text}
    * keeps the public reply; {@code limits.stop_at} keeps {@code max_sends}.
    * {@code public_reply.enabled: false} or {@code variations: []} turns the
-   * public reply off; {@code limits.max_sends: null} removes that limit.
+   * public reply off; {@code follow_gate.enabled: false} turns Follow first
+   * off and keeps its texts, new texts keep the switch, and
+   * {@code follow_gate: null} turns it off; {@code limits.max_sends: null}
+   * removes that limit.
    * {@code status: "paused"} pauses and {@code "active"} resumes; another
    * {@code post_id} / {@code instagram_media_id} / {@code facebook_post_id}
    * moves the automation to that post. The platform cannot change: a
@@ -143,15 +161,20 @@ public final class AutomationsResource extends ApiResource {
    * {@code counts} is the number of events per outcome (an outcome with no
    * events is left out). Each event carries {@code kind} ({@code comment},
    * {@code dm}, {@code story_reply}), {@code outcome} (also {@code queued}:
-   * waits for a free slot under the send cap, out within the hour; and
-   * {@code opted_out}: the person replied STOP on X), {@code reason} /
-   * {@code reason_label} (X adds the skip reasons {@code dms_closed},
-   * {@code no_credits}, {@code opted_out} and {@code automation_off}),
+   * waits for a free slot under the send cap, out within the hour;
+   * {@code opted_out}: the person replied STOP on X; and {@code waiting}:
+   * Follow first, asked to follow, the link goes out after the follow),
+   * {@code reason} / {@code reason_label} (X adds the skip reasons
+   * {@code dms_closed}, {@code no_credits}, {@code opted_out} and
+   * {@code automation_off}; Follow first adds {@code already_waiting}),
    * {@code person} ({@code id}, {@code username}; on
    * Facebook the person's name, since Facebook has no @handle),
    * {@code trigger_id}, {@code trigger_text}, {@code message} (the DM sent),
-   * {@code public_reply}, {@code platform_message_id}, {@code created_at}
-   * and {@code sent_at}.
+   * {@code public_reply}, {@code platform_message_id}, {@code follow_gate}
+   * (Follow first: {@code state} {@code waiting} or {@code done},
+   * {@code asked_at}, {@code taps}, {@code followed}, {@code checked},
+   * {@code after_ask}; else {@code null}), {@code created_at} and
+   * {@code sent_at}.
    */
   public JsonNode listEvents(String id) {
     return client.get("/automations/" + seg(id) + "/events");
@@ -161,7 +184,7 @@ public final class AutomationsResource extends ApiResource {
    * {@code GET /automations/:id/events?outcome=&limit=&offset=} - the
    * activity with filters. Query params: {@code outcome} ({@code sent} |
    * {@code skipped} | {@code failed} | {@code pending} | {@code queued} |
-   * {@code opted_out}), {@code limit} (1 to
+   * {@code opted_out} | {@code waiting}), {@code limit} (1 to
    * 100, default 25), {@code offset}. See {@link #listEvents(String)} for the
    * response shape ({@code data}, {@code counts}, {@code pagination}).
    */

@@ -9,13 +9,16 @@ import com.omnisocials.errors.ApiException;
 import com.omnisocials.errors.AuthenticationException;
 import com.omnisocials.errors.OmniSocialsException;
 import com.omnisocials.resources.AccountsResource;
+import com.omnisocials.resources.AdsResource;
 import com.omnisocials.resources.AnalyticsResource;
 import com.omnisocials.resources.ApprovalWorkflowsResource;
 import com.omnisocials.resources.AudioResource;
 import com.omnisocials.resources.AutomationsResource;
+import com.omnisocials.resources.FeatureRequestsResource;
 import com.omnisocials.resources.FoldersResource;
 import com.omnisocials.resources.HashtagSetsResource;
 import com.omnisocials.resources.InboxResource;
+import com.omnisocials.resources.LimitsResource;
 import com.omnisocials.resources.LocationsResource;
 import com.omnisocials.resources.MediaResource;
 import com.omnisocials.resources.PinterestResource;
@@ -63,12 +66,13 @@ import java.util.stream.Collectors;
  * {@link ApiException} subclass; network failures throw
  * {@link ApiConnectionException}. 429 / 5xx / connection errors are retried
  * automatically with exponential backoff and jitter, honoring
- * {@code Retry-After}.
+ * {@code Retry-After}. A call that can start or raise ad spend is retried on a
+ * 429 only (see {@link RetryPolicy#RATE_LIMIT_ONLY}).
  */
 public final class OmniSocials {
 
   /** SDK version, also used in the User-Agent header. */
-  public static final String VERSION = "0.14.0";
+  public static final String VERSION = "0.15.0";
 
   public static final String DEFAULT_BASE_URL = "https://api.omnisocials.com/v1";
   public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
@@ -96,8 +100,11 @@ public final class OmniSocials {
   private final LocationsResource locations;
   private final PinterestResource pinterest;
   private final AutomationsResource automations;
+  private final AdsResource ads;
   private final InboxResource inbox;
   private final WebhooksResource webhooks;
+  private final LimitsResource limits;
+  private final FeatureRequestsResource featureRequests;
 
   private OmniSocials(Builder builder, String apiKey) {
     this.apiKey = apiKey;
@@ -122,8 +129,11 @@ public final class OmniSocials {
     this.locations = new LocationsResource(this);
     this.pinterest = new PinterestResource(this);
     this.automations = new AutomationsResource(this);
+    this.ads = new AdsResource(this);
     this.inbox = new InboxResource(this);
     this.webhooks = new WebhooksResource(this);
+    this.limits = new LimitsResource(this);
+    this.featureRequests = new FeatureRequestsResource(this);
   }
 
   /** Start building a client. */
@@ -186,12 +196,26 @@ public final class OmniSocials {
     return automations;
   }
 
+  public AdsResource ads() {
+    return ads;
+  }
+
   public InboxResource inbox() {
     return inbox;
   }
 
   public WebhooksResource webhooks() {
     return webhooks;
+  }
+
+  /** What OmniSocials cannot do, why, and what to do instead. */
+  public LimitsResource limits() {
+    return limits;
+  }
+
+  /** Feature requests to the OmniSocials team, for the person who owns the key. */
+  public FeatureRequestsResource featureRequests() {
+    return featureRequests;
   }
 
   /** {@code GET /health} (no scopes required). */
@@ -204,27 +228,50 @@ public final class OmniSocials {
   // wrapped) can use them; most callers should go through the resources.
 
   public JsonNode get(String path) {
-    return request("GET", path, null, null, null);
+    return request("GET", path, null, null, null, RetryPolicy.DEFAULT);
   }
 
   public JsonNode get(String path, Map<String, Object> query) {
-    return request("GET", path, query, null, null);
+    return request("GET", path, query, null, null, RetryPolicy.DEFAULT);
   }
 
   public JsonNode post(String path) {
-    return request("POST", path, null, null, null);
+    return post(path, RetryPolicy.DEFAULT);
+  }
+
+  /** POST without a body, retried as {@code retry} says. */
+  public JsonNode post(String path, RetryPolicy retry) {
+    return request("POST", path, null, null, null, retry);
   }
 
   public JsonNode post(String path, Map<String, Object> body) {
-    return request("POST", path, null, body == null ? Map.of() : body, null);
+    return post(path, body, RetryPolicy.DEFAULT);
+  }
+
+  /**
+   * POST a JSON body, retried as {@code retry} says. A call that can start ad
+   * spend passes {@link RetryPolicy#RATE_LIMIT_ONLY}.
+   */
+  public JsonNode post(String path, Map<String, Object> body, RetryPolicy retry) {
+    return request("POST", path, null, body == null ? Map.of() : body, null, retry);
   }
 
   public JsonNode patch(String path, Map<String, Object> body) {
-    return request("PATCH", path, null, body == null ? Map.of() : body, null);
+    return patch(path, body, RetryPolicy.DEFAULT);
+  }
+
+  /** PATCH a JSON body, retried as {@code retry} says. */
+  public JsonNode patch(String path, Map<String, Object> body, RetryPolicy retry) {
+    return request("PATCH", path, null, body == null ? Map.of() : body, null, retry);
+  }
+
+  /** PUT a JSON body: it replaces the whole resource. */
+  public JsonNode put(String path, Map<String, Object> body) {
+    return request("PUT", path, null, body == null ? Map.of() : body, null, RetryPolicy.DEFAULT);
   }
 
   public JsonNode delete(String path) {
-    return request("DELETE", path, null, null, null);
+    return request("DELETE", path, null, null, null, RetryPolicy.DEFAULT);
   }
 
   /** POST a multipart/form-data body with one "file" part plus optional text fields. */
@@ -236,7 +283,7 @@ public final class OmniSocials {
       Map<String, Object> fields) {
     Objects.requireNonNull(fileBytes, "fileBytes");
     MultipartBody form = MultipartBody.build(fileBytes, filename, fileContentType, fields);
-    return request("POST", path, null, null, form);
+    return request("POST", path, null, null, form, RetryPolicy.DEFAULT);
   }
 
   // ─── Core request loop ─────────────────────────────────────────────────────
@@ -246,7 +293,9 @@ public final class OmniSocials {
       String path,
       Map<String, Object> query,
       Map<String, Object> jsonBody,
-      MultipartBody multipart) {
+      MultipartBody multipart,
+      RetryPolicy retry) {
+    boolean rateLimitOnly = retry == RetryPolicy.RATE_LIMIT_ONLY;
     URI uri = buildUri(path, query);
 
     HttpRequest.Builder requestBuilder =
@@ -281,8 +330,9 @@ public final class OmniSocials {
         response =
             httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
       } catch (IOException e) {
-        // Network failure or timeout: retryable.
-        if (attempt < maxRetries) {
+        // Network failure or timeout: retryable, unless the call may have
+        // started ad spend.
+        if (!rateLimitOnly && attempt < maxRetries) {
           sleep(backoffMillis(attempt, null));
           attempt++;
           continue;
@@ -315,7 +365,7 @@ public final class OmniSocials {
       }
 
       Long retryAfter = parseRetryAfter(response.headers().firstValue("retry-after").orElse(null));
-      boolean retryable = status == 429 || status >= 500;
+      boolean retryable = status == 429 || (status >= 500 && !rateLimitOnly);
       if (retryable && attempt < maxRetries) {
         sleep(backoffMillis(attempt, retryAfter));
         attempt++;

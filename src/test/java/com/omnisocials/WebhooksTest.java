@@ -65,6 +65,30 @@ class WebhooksTest {
   }
 
   @Test
+  void adStatusChangedEventCarriesTheCampaign() throws Exception {
+    String body =
+        "{\"id\":\"evt_789\",\"type\":\"ad.status_changed\",\"created_at\":\"2026-07-13T10:00:05Z\","
+            + "\"data\":{\"campaign_id\":42,\"workspace_id\":\"456\","
+            + "\"name\":\"Boost: Summer launch post\",\"platform\":\"meta\","
+            + "\"campaign_type\":\"boost\",\"status\":\"active\","
+            + "\"previous_status\":\"pending_review\","
+            + "\"external_campaign_id\":\"23851234567890123\","
+            + "\"budget\":{\"type\":\"daily\",\"amount\":10,\"currency\":\"EUR\"}}}";
+    long ts = System.currentTimeMillis() / 1000L;
+
+    JsonNode event = Webhooks.verifySignature(body, sign(SECRET, ts, body), SECRET, 300);
+
+    assertEquals("ad.status_changed", event.get("type").asText());
+    JsonNode data = event.get("data");
+    assertEquals(42L, data.get("campaign_id").asLong());
+    assertEquals("pending_review", data.get("previous_status").asText());
+    assertEquals("active", data.get("status").asText());
+    assertEquals(10, data.get("budget").get("amount").asInt());
+    assertEquals("EUR", data.get("budget").get("currency").asText());
+    assertTrue(!data.has("post_id"), "an ad event's data is the campaign, not a post");
+  }
+
+  @Test
   void tamperedPayloadFails() throws Exception {
     long ts = System.currentTimeMillis() / 1000L;
     String header = sign(SECRET, ts, BODY);
