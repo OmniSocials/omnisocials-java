@@ -26,20 +26,27 @@ class AdsResourceTest {
   private static final String BAD_GATEWAY =
       "{\"error\":{\"code\":\"bad_gateway\",\"message\":\"upstream\"}}";
 
-  /** One recorded request: method, raw path and body. */
+  /** One recorded request: method, raw path, raw query and body. */
   private static final class Seen {
     final String method;
     final String path;
+    final String query;
     final String body;
 
-    Seen(String method, String path, String body) {
+    Seen(String method, String path, String query, String body) {
       this.method = method;
       this.path = path;
+      this.query = query;
       this.body = body;
     }
 
     JsonNode json() throws IOException {
       return MAPPER.readTree(body);
+    }
+
+    /** "METHOD /path?query" as one line. */
+    String line() {
+      return method + " " + path + (query == null ? "" : "?" + query);
     }
   }
 
@@ -50,7 +57,10 @@ class AdsResourceTest {
               new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
           seen.add(
               new Seen(
-                  exchange.getRequestMethod(), exchange.getRequestURI().getRawPath(), requestBody));
+                  exchange.getRequestMethod(),
+                  exchange.getRequestURI().getRawPath(),
+                  exchange.getRequestURI().getRawQuery(),
+                  requestBody));
           exchange.getResponseHeaders().set("Retry-After", "0");
           TestServer.respond(exchange, status, body);
         });
@@ -220,6 +230,106 @@ class AdsResourceTest {
 
       assertEquals(2, requests.get(), "a 429 means nothing started, so it is retried");
       assertEquals("g-1", launched.get("data").get("group").get("group_id").asText());
+    }
+  }
+
+  // ─── Ads API parity (2026-11-05) ───────────────────────────────────────────
+
+  @Test
+  void parityCallsSendTheRightRequests() throws IOException {
+    List<Seen> seen = Collections.synchronizedList(new ArrayList<>());
+    try (TestServer server = recording(seen, 200, "{\"data\":{}}")) {
+      com.omnisocials.resources.AdsResource ads = client(server).ads();
+
+      ads.objects().tree(12, Params.of("from", "2026-10-01", "status", List.of("active", "paused")));
+      ads.objects().get(12, "ad_set", "23851/1");
+      ads.objects().setStatus(12, "ad", "9", "paused", null);
+      ads.objects().setStatus(12, "campaign", "238", "active", 25);
+      ads.objects().startImport(12);
+      ads.bulkStatus(List.of(7L, 8L), "active", 10);
+      ads.campaignAds().add(7, List.of(Params.of("primary_text", "Hi", "link", "https://example.com")));
+      ads.campaignAds().setStatus(7, 41, "active", 10);
+      ads.previews().forAd(7, 41, List.of("feed", "story"));
+      ads.targeting().search(Params.of("ad_account_id", 12, "type", "interest", "q", "yoga"));
+      ads.audiences().get("aud 1", 12);
+      ads.audiences()
+          .removeMembers(
+              "aud-1",
+              Params.of("ad_account_id", 12, "schema", List.of("email"), "rows", List.of(List.of("a@example.com"))));
+      ads.leadForms().list(12);
+      ads.insights().campaign(7, Params.of("breakdown", "ad"));
+      ads.rules().undo(3, 20);
+      ads.rules().previewSaved(4);
+      ads.results().putMetric("revenue", Params.of("label", "Revenue"));
+      ads.media().delete("abc", Params.of("ad_account_id", 12, "type", "image"));
+      ads.comments().hide(7, 41, "c:1", false);
+      ads.accounts().updateSettings(12, Params.of("spend_cap", null, "confirm_budget_amount", "remove"));
+      ads.reachFrequency().reserve("rf1", 12, 500);
+      ads.reachFrequency().cancel("rf1", 12);
+      ads.budgetSchedules().delete(7, "bs-1");
+      ads.google().searchTerms(Params.of("ad_account_id", 12, "limit", 20));
+
+      String[][] expected = {
+        {"GET /ads/accounts/12/tree?from=2026-10-01&status=active%2Cpaused", ""},
+        {"GET /ads/accounts/12/objects/ad_set/23851%2F1", ""},
+        {"PUT /ads/accounts/12/objects/ad/9/status", "{\"status\":\"paused\"}"},
+        {"PUT /ads/accounts/12/objects/campaign/238/status", "{\"status\":\"active\",\"confirm_budget_amount\":25}"},
+        {"POST /ads/accounts/12/import", ""},
+        {"POST /ads/campaigns/bulk-status", "{\"campaign_ids\":[7,8],\"status\":\"active\",\"confirm_budget_amount\":10}"},
+        {"POST /ads/campaigns/7/ads", "{\"ads\":[{\"primary_text\":\"Hi\",\"link\":\"https://example.com\"}]}"},
+        {"PUT /ads/campaigns/7/ads/41/status", "{\"status\":\"active\",\"confirm_budget_amount\":10}"},
+        {"GET /ads/campaigns/7/ads/41/previews?placements=feed%2Cstory", ""},
+        {"GET /ads/targeting/search?ad_account_id=12&type=interest&q=yoga", ""},
+        {"GET /ads/audiences/aud%201?ad_account_id=12", ""},
+        {"DELETE /ads/audiences/aud-1/members", "{\"ad_account_id\":12,\"schema\":[\"email\"],\"rows\":[[\"a@example.com\"]]}"},
+        {"GET /ads/lead-forms?ad_account_id=12", ""},
+        {"GET /ads/campaigns/7/analytics?breakdown=ad", ""},
+        {"POST /ads/rules/activity/3/undo", "{\"confirm_budget_amount\":20}"},
+        {"POST /ads/rules/4/preview", ""},
+        {"PUT /ads/campaign-results/metrics/revenue", "{\"label\":\"Revenue\"}"},
+        {"DELETE /ads/media/abc?ad_account_id=12&type=image", ""},
+        {"POST /ads/campaigns/7/ads/41/comments/c%3A1/hide", "{\"hidden\":false}"},
+        {"PATCH /ads/accounts/12/settings", "{\"spend_cap\":null,\"confirm_budget_amount\":\"remove\"}"},
+        {"POST /ads/reach-frequency/rf1/reserve", "{\"ad_account_id\":12,\"confirm_budget_amount\":500}"},
+        {"DELETE /ads/reach-frequency/rf1?ad_account_id=12", ""},
+        {"DELETE /ads/campaigns/7/budget-schedules/bs-1", ""},
+        {"GET /ads/google/search-terms?ad_account_id=12&limit=20", ""},
+      };
+      assertEquals(expected.length, seen.size());
+      for (int i = 0; i < expected.length; i++) {
+        assertEquals(expected[i][0], seen.get(i).line(), "request " + i);
+        assertEquals(expected[i][1], seen.get(i).body, "body of " + expected[i][0]);
+      }
+    }
+  }
+
+  @Test
+  void parityMoneyCallsAreSentOnceAfterA502() throws IOException {
+    List<Seen> seen = Collections.synchronizedList(new ArrayList<>());
+    try (TestServer server = recording(seen, 502, BAD_GATEWAY)) {
+      com.omnisocials.resources.AdsResource ads = client(server).ads();
+      List<Runnable> moneyCalls =
+          List.of(
+              () -> ads.objects().update(12, "campaign", "238", Params.of("confirm_budget_amount", 30)),
+              () -> ads.objects().setStatus(12, "campaign", "238", "active", 25),
+              () -> ads.bulkStatus(List.of(7L, 8L), "active", 10),
+              () -> ads.campaignAds().setStatus(7, 41, "active", 10),
+              () -> ads.rules().create(Params.of("name", "Raise", "confirm_max_daily_budget", 50)),
+              () -> ads.rules().update(4, Params.of("enabled", true)),
+              () -> ads.rules().undo(3, 20),
+              () -> ads.accounts().updateSettings(12, Params.of("spend_cap", 900, "confirm_budget_amount", 900)),
+              () -> ads.reachFrequency().reserve("rf1", 12, 500),
+              () -> ads.budgetSchedules().create(7, Params.of("confirm_budget_amount", 20)));
+
+      for (int i = 0; i < moneyCalls.size(); i++) {
+        seen.clear();
+        assertThrows(ServerException.class, moneyCalls.get(i)::run);
+        assertEquals(1, seen.size(), "money call " + i + " (" + (seen.isEmpty() ? "?" : seen.get(0).line()) + ") is sent once after a 502");
+      }
+
+      seen.clear();
+      assertThrows(ServerException.class, () -> ads.objects().tree(12));
+      assertEquals(3, seen.size(), "a read is retried: initial attempt + 2 retries");
     }
   }
 }

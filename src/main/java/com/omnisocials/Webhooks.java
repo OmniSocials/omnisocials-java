@@ -20,6 +20,14 @@ import javax.crypto.spec.SecretKeySpec;
  * {@code "{timestamp}.{rawBody}"} computed with your webhook signing secret.
  * Always verify against the RAW request body, exactly as received. Do not
  * parse and re-serialize it first.
+ *
+ * <p>Secret rotation: for 24 hours after {@code webhooks().rotateSecret(id)},
+ * every delivery carries {@code X-OmniSocials-Signature} (signed with the new
+ * secret) and {@code X-OmniSocials-Signature-Previous} (signed with the old
+ * secret, same format, same timestamp and body). To keep accepting deliveries
+ * while you switch secrets, verify {@code X-OmniSocials-Signature} with the new
+ * secret and, when that throws, {@code X-OmniSocials-Signature-Previous} with
+ * the old one.
  */
 public final class Webhooks {
 
@@ -45,6 +53,8 @@ public final class Webhooks {
    *
    * @param payload the RAW request body, exactly as received
    * @param signature the {@code X-OmniSocials-Signature} header value: {@code t=<unix>,v1=<hex>}
+   *     (for 24 hours after a secret rotation, the {@code X-OmniSocials-Signature-Previous}
+   *     value with the old secret when the new secret does not match)
    * @param secret the webhook signing secret (shown once on create / rotate-secret)
    * @param toleranceSeconds max allowed age of the timestamp, in seconds
    * @return the parsed event object on success

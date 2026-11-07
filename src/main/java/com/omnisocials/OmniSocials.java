@@ -72,7 +72,7 @@ import java.util.stream.Collectors;
 public final class OmniSocials {
 
   /** SDK version, also used in the User-Agent header. */
-  public static final String VERSION = "0.15.0";
+  public static final String VERSION = "0.16.0";
 
   public static final String DEFAULT_BASE_URL = "https://api.omnisocials.com/v1";
   public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
@@ -267,11 +267,26 @@ public final class OmniSocials {
 
   /** PUT a JSON body: it replaces the whole resource. */
   public JsonNode put(String path, Map<String, Object> body) {
-    return request("PUT", path, null, body == null ? Map.of() : body, null, RetryPolicy.DEFAULT);
+    return put(path, body, RetryPolicy.DEFAULT);
+  }
+
+  /** PUT a JSON body, retried as {@code retry} says. */
+  public JsonNode put(String path, Map<String, Object> body, RetryPolicy retry) {
+    return request("PUT", path, null, body == null ? Map.of() : body, null, retry);
   }
 
   public JsonNode delete(String path) {
     return request("DELETE", path, null, null, null, RetryPolicy.DEFAULT);
+  }
+
+  /** DELETE with query params (for example {@code ad_account_id}). */
+  public JsonNode delete(String path, Map<String, Object> query) {
+    return request("DELETE", path, query, null, null, RetryPolicy.DEFAULT);
+  }
+
+  /** DELETE with query params and a JSON body (removing people from a customer list). */
+  public JsonNode delete(String path, Map<String, Object> query, Map<String, Object> body) {
+    return request("DELETE", path, query, body, null, RetryPolicy.DEFAULT);
   }
 
   /** POST a multipart/form-data body with one "file" part plus optional text fields. */

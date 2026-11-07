@@ -89,7 +89,10 @@ public final class MediaResource extends ApiResource {
    * {@code POST /media/upload-from-url} - the server fetches a public URL
    * (files up to 1GB; large videos finish processing in the background and
    * come back with status "processing"). Params: {@code url} (required),
-   * {@code name}, {@code folder}, {@code folder_id}, {@code pdf_mode}.
+   * {@code name}, {@code folder}, {@code folder_id}, {@code pdf_mode}. A file
+   * over 100 MB that could not be queued for processing answers
+   * {@code 503 processing_unavailable}: send the same request again in a
+   * minute.
    */
   public JsonNode uploadFromUrl(Map<String, Object> params) {
     return client.post("/media/upload-from-url", params);

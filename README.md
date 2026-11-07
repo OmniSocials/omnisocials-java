@@ -17,14 +17,14 @@ Maven:
 <dependency>
   <groupId>com.omnisocials</groupId>
   <artifactId>omnisocials-java</artifactId>
-  <version>0.15.0</version>
+  <version>0.16.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation "com.omnisocials:omnisocials-java:0.15.0"
+implementation "com.omnisocials:omnisocials-java:0.16.0"
 ```
 
 ## Quickstart
@@ -343,14 +343,38 @@ client.posts().delete(id);   // returns null (204)
 
 `retry` re-publishes only the platforms that failed, on the same post; platforms that already succeeded are never posted again. It is asynchronous: a 200 means the retry is queued, so poll `get` for the outcome. Max 3 retries per platform.
 
+These calls throw a 409 `ApiException` and change nothing when the post is not in a state for them:
+
+- `post_publishing`: `update` or `delete` while the post is publishing (status `posting`) or a retry publishes one of its channels. Poll `get` until the status is `published`, `warning` or `failed`. An `update` with only `tags` still works.
+- `review_required`: changes were requested on the post (`approval_status` `rejected`), so `publish`, or an `update` that would schedule it, is refused. It needs a new review: create it again with `approval_workflow_id`. Saving it as a draft works.
+- `retry_in_progress`: `retry` while another retry of the post runs.
+- `media_processing`: a media id in `create`, `createAndPublish` or `update` is still processing. Wait until `client.media().get(id)` says `ready`, then send the same request again. A file whose processing failed answers `400 invalid_media`: upload it again.
+
 ### Approve or reject a post
 
 ```java
-client.posts().approve(id);                                      // approve the current approval-workflow step
-client.posts().reject(id, "Wrong CTA link, please fix.");        // reject and stop the workflow (comment optional; reject(id) also works)
+import com.omnisocials.errors.ApiException;
+
+// Read the step you review first, then name it on the decision.
+JsonNode review = client.posts().getApproval(id).get("data");
+Integer step = review.path("current_step").isInt() ? review.get("current_step").asInt() : null;
+
+try {
+  client.posts().approve(id, step); // approve the step you reviewed
+  // or: reject and stop the workflow (comment optional, pass null)
+  // client.posts().reject(id, "Wrong CTA link, please fix.", step);
+} catch (ApiException e) {
+  if (!"step_changed".equals(e.getCode())) {
+    throw e;
+  }
+  // Somebody decided since you read it: nothing was decided. Read the approval again.
+  System.out.println("The review is on step " + e.getBody().path("error").path("current_step_order").asInt());
+}
 ```
 
-Only works on a post with `approval_status: "pending"` (`status: "in_approval"`). Both act on behalf of the user who owns the API key, who must be a listed approver for the workflow's CURRENT step — steps approve in order, so being an approver on a later step is not enough yet (throws a `PermissionDeniedException` with code `forbidden`). Approving the last step finalizes the post (`scheduled` or `posting`); rejecting stops the whole workflow immediately, not just the current step.
+Only works on a post with `approval_status: "pending"` (`status: "in_approval"`). Both act on behalf of the user who owns the API key, who must be a listed approver for the workflow's CURRENT step. Steps approve in order, so being an approver on a later step is not enough yet (throws a `PermissionDeniedException` with code `forbidden`). Approving the last step finalizes the post (`scheduled` or `posting`); rejecting stops the whole workflow immediately, not just the current step.
+
+The step (`Integer`, `null` leaves it out) is optional: the `current_step` of `getApproval`. When the review is on another step now (somebody decided since you read it, or a retried call already went through), nothing is decided and the call throws a 409 `ApiException` with code `step_changed` and `error.current_step_order`, the step the review is on now. Without it the call acts on whatever step is current, so a retry after a timeout could approve the next step too. `approve(id)`, `reject(id)` and `reject(id, comment)` still work.
 
 ### Read the approval review
 
@@ -391,7 +415,7 @@ System.out.println(upload.get("data").get("id").asText());
 System.out.println(upload.get("compatibility"));
 ```
 
-Videos over 100MB are processed in the background and come back with status `"processing"`. Every upload response includes a `compatibility` block listing connected platforms that would reject the file.
+Videos over 100MB are processed in the background and come back with status `"processing"`; when such a file cannot be queued, the call throws a 503 `processing_unavailable` (send the same request again in a minute). Every upload response includes a `compatibility` block listing connected platforms that would reject the file.
 
 ### Upload a local file (multipart)
 
@@ -558,6 +582,8 @@ for (JsonNode account : accounts.get("data")) {
 }
 client.accounts().get(accounts.get("data").get(0).get("id").asText());
 ```
+
+`status` is `active` or `needs_reconnect` (the token was revoked or expired; Bluesky also when its sign-in could not be renewed). Posts to a `needs_reconnect` account fail until it is reconnected in the OmniSocials app. OmniSocials Connect customer workspaces can also show `pick_pending` (Facebook, Connect customers only: no Page chosen yet).
 
 ## Analytics
 
@@ -749,11 +775,11 @@ A workspace's X inbox is automatically suspended once its credit balance hits ze
 
 ## Ads
 
-Boost a published post or create a new ad on Meta, Pinterest, TikTok, LinkedIn, X and Google. Ads spend real money, so every call that starts or raises spend asks for the amount again: `ads().activate()`, `ads().activateMulti()`, `ads().drafts().launch()` and a budget raise through `ads().update()`. Show the person the amount first and pass it only after they agree. These calls and `ads().resume()` are not retried after a 5xx or a timeout, because the first attempt may have started the ad: read the campaign or the draft to see what happened. A 429 is still retried.
+Boost a published post or create a new ad on Meta, Pinterest, TikTok, LinkedIn, X and Google. Boosts and new ads are drafts: your code writes the draft, and the person who pays sees the amount and starts the ad in OmniSocials from the draft's `review_url`. A key starts and raises spend itself only with the opt-in **Start ads** switch (scope `ads:spend`). Without it `ads().activate()`, `ads().activateMulti()`, `ads().resume()`, `ads().drafts().launch()`, a budget raise or any change of a campaign that reached the network through `ads().update()`, and the parity calls that switch something on or raise a budget answer `403 start_in_app` (a `PermissionDeniedException`), and the error message names the page where the person does it. Google (`api_draft_only` on `ads().capabilities()`) always stops at the draft, also with `ads:spend`. `ads().pause()` and `ads().delete()` stay open, except on the networks in `api_stop_in_app` (Google), where a campaign that reached the network also answers `403 start_in_app`. Only a paused campaign resumes (`409 not_paused`). The calls that start or raise spend repeat the amount (`confirm_budget_amount`) and are not retried after a 5xx or a timeout, only after a 429, because the first attempt may have started the ad.
 
-The `ads:read` and `ads:write` scopes are opt-in: create the API key with **Ads** switched on (Settings, API). A key without them gets a `PermissionDeniedException` with code `insufficient_scope`. Ad accounts are connected and picked in the OmniSocials dashboard. Budgets are in major units (10 = 10 EUR) in the ad account's currency.
+The `ads:read` and `ads:write` scopes are opt-in: create the API key with **Ads** switched on (Settings, API). `ads:spend` is the **Start ads** switch under it, offered only to a person with `manage_ads`. A key without a scope it needs gets a `PermissionDeniedException` with code `insufficient_scope`. Ad accounts are connected and picked in the OmniSocials dashboard. Budgets are in major units (10 = 10 EUR) in the ad account's currency: a draft whose `budget.currency` differs from an attached ad account's currency gets `400 currency_mismatch`, and an ads error may name the field in `e.getBody().path("error").path("param")` (here `budget.currency`).
 
-### Create an ad (draft, then launch)
+### Create an ad (a draft the person starts)
 
 ```java
 JsonNode caps = client.ads().capabilities().get("data");
@@ -776,16 +802,11 @@ JsonNode draft = client.ads().drafts().create(Params.builder()
         .build()))
     .build()).get("data");
 
-// A draft spends nothing. Hand draft.review_url to the person, or start it
-// after they confirmed 10 EUR a day per network:
-JsonNode launch = client.ads().drafts().launch(draft.get("group_id").asText(), 10).get("data");
-for (JsonNode result : launch.get("results")) {
-  System.out.println(result.get("platform").asText() + " "
-      + (result.get("ok").asBoolean() ? "started" : result.get("error").asText()));
-}
+// A draft spends nothing. The person checks it and starts it in OmniSocials:
+System.out.println("Check and start the ad here: " + draft.get("review_url").asText());
 ```
 
-A draft needs no ad account; `client.ads().drafts().attachAccount(groupId, "meta", adAccountId)` sets one, and `campaigns[].readiness` says what still stops a network. To confirm a different daily amount per campaign, pass `Params.of("confirm_budget_amounts", Params.of("41", 10, "42", 20))` to `launch(groupId, params)`. `drafts().update(groupId, params)` replaces the whole draft (HTTP PUT). On Meta an ad can carry a second upright 9:16 file for Stories and Reels: `placement_media` with `stories_reels` (`url`, `type`).
+A draft needs no ad account; `client.ads().drafts().attachAccount(groupId, "meta", adAccountId)` sets one, and `campaigns[].readiness` says what still stops a network. With a key that has `ads:spend`, `client.ads().drafts().launch(draft.get("group_id").asText(), 10)` starts the draft after the person agreed to the amount; Google is skipped with code `start_in_app`. Without `ads:spend` the call answers `403 start_in_app`. To confirm a different daily amount per campaign it takes `Params.of("confirm_budget_amounts", Params.of("41", 10, "42", 20))` as `launch(groupId, params)`. `drafts().update(groupId, params)` replaces the whole draft (HTTP PUT). On Meta an ad can carry a second upright 9:16 file for Stories and Reels: `placement_media` with `stories_reels` (`url`, `type`).
 
 ### Boost a post
 
@@ -805,15 +826,54 @@ JsonNode boost = client.ads().boost(Params.builder()
     .put("targeting", Params.of("countries", List.of("NL")))
     .build()).get("data");
 
-// The boost is a draft. Start it only after the person confirmed 5 a day:
-client.ads().activate(boost.get("id").asLong(), 5);
+// The boost is a draft: the person starts it in OmniSocials.
+System.out.println(boost.get("status").asText()); // "draft"
 ```
 
-`client.ads().boostMulti(params)` makes one draft boost per ad account (`ad_account_ids`, up to 10, the same budget each). `suggestions()` lists posts that do better than your median, `overview()` the totals, and `list()`, `get(id)`, `pause(id)`, `resume(id)` and `delete(id)` manage campaigns. Keyword ideas through the connected Google Ads account: `researchKeywords(Params.of("keywords", List.of("running shoes"), "country", "NL"))` and `keywordMetrics(Params.of("keywords", List.of("running shoes", "trail shoes")))`.
+`client.ads().boostMulti(params)` makes one draft boost per ad account (`ad_account_ids`, up to 10, the same budget each). `suggestions()` lists posts that do better than your median, `overview()` the totals (`totals.spend` is null when the campaigns use more than one currency: read `totals_by_currency`, one row per currency), and `list()`, `get(id)`, `pause(id)` and `delete(id)` manage campaigns. Keyword ideas through the connected Google Ads account: `researchKeywords(Params.of("keywords", List.of("running shoes"), "country", "NL"))` and `keywordMetrics(Params.of("keywords", List.of("running shoes", "trail shoes")))`.
+
+
+### The rest of the Ads API
+
+Each group hangs off `client.ads()`. A network without a feature answers `400 not_supported_on_network`; `capabilities().get("data").get("features")` lists what each network offers. Params are `Map<String, Object>` and results `JsonNode`, like the rest of the SDK.
+
+| Accessor | What it covers |
+|----------|----------------|
+| `objects()` | the live tree of an ad account (`tree`), one campaign, ad set or ad (`get`, `update`, `setStatus`, `duplicate`), the import of campaigns made outside OmniSocials (`importStatus`, `startImport`, `listExternal`, `getExternal`) |
+| `targeting()` | `search`, `browse`, `reachEstimate`, `bidSuggestions` |
+| `audiences()` | customer lists, lookalikes and company lists: `list`, `create`, `get`, `update`, `delete`, `addMembers`, `removeMembers`, `addCompanies` (raw emails and phones are hashed before they leave) |
+| `campaignAds()` | the ads of a campaign: `list`, `add` (created paused), `get`, `setStatus`, `review` |
+| `leadForms()`, `leads()` | lead forms (`list`, `create`, `get`, `update`, `delete`, `sendTestLead`) and their leads (`list`, `counts`, `update`) |
+| `conversions()` | `destinations`, `goals`, `createCustom`, `sendEvents` |
+| `insights()`, `reports()` | `query`, `campaign`, `ad`, `timeline`, `performance`, `alerts`; background reports (`list`, `start`, `get`) |
+| `rules()` | automated rules: `list`, `create`, `templates`, `preview`, `activity`, `undo`, `get`, `update`, `delete`, `previewSaved`, `runs` |
+| `results()` | your own numbers per campaign and day: `list`, `upload`, `totals`, `metrics`, `putMetric` |
+| `media()`, `previews()`, `partnership()`, `comments()` | the network's media library, previews drawn by the network (`create`, `forAd`), Meta partnership ads (`listContent`, `listPermissions`, `setPermission`), comments on ads |
+| `accounts()` | one ad account: `health`, `finance`, `updateSettings`, `listUsers`, `addUser`, `removeUser`, `activity`, `businesses`, `dsa`, `hierarchy`, `identities` |
+| `reachFrequency()`, `studies()`, `budgetSchedules()` | Meta reach and frequency, A/B tests, planned budget increases |
+| `google()` | Google reports: `searchTerms`, `recommendations`, `keywords`, `assets`, `sharedBudgets`, `bidStrategies`, `adSchedule`, `labels`, `localServicesLeads` |
+
+On campaigns: `client.ads().duplicate(id, params)` (a new draft) and `client.ads().bulkStatus(ids, "paused", null)`.
+
+```java
+// Search an interest, then target it on Meta in a draft.
+JsonNode item = client.ads().targeting()
+    .search(Params.of("ad_account_id", 51, "type", "interest", "q", "yoga"))
+    .get("data").get("items").get(0);
+Map<String, Object> targeting = Params.of(
+    "countries", List.of("NL"),
+    "networks", Params.of("meta", Params.of("include",
+        Params.of("interest", List.of(Params.of("id", item.get("id").asText(), "name", item.get("name").asText())))))));
+
+// Pause one ad set made outside OmniSocials (no amount needed to pause).
+client.ads().objects().setStatus(51, "ad_set", "23851", "paused", null);
+```
+
+The same money rule holds here: switching anything on (`objects().setStatus`, `campaignAds().setStatus`, `bulkStatus` with `active`), adding ads to a running campaign (`campaignAds().add`), a change of an object on the network (`objects().update`, `objects().duplicate`), a rule that can raise spend (`rules().create` and `rules().update` with `confirm_max_daily_budget`, `rules().undo`), a spend cap change (`accounts().updateSettings`), a reach and frequency reservation (`reachFrequency().reserve`), a study (`studies().create`) and a planned budget increase (`budgetSchedules().create`) need a key with `ads:spend` (else, and on Google always, `403 start_in_app`; a rule: `403 rule_raises_spend`). Each needs the amount from the person's explicit yes, and none of them is retried after a 5xx or a timeout. Rules that notify, pause or lower a budget work with `ads:write`, and at run time a rule never acts on Google. Pausing, deleting and archiving stay open, except on Google.
 
 ## Webhooks
 
-Events: `post.scheduled`, `post.published`, `post.failed`, `post.approved` (the last step of a post's approval workflow is approved) and `post.rejected` (an approver rejects the post; it will not publish). The two approval events carry `data.approval` with `status`, `decided_by` (the approver's user id) and `reason` (null on `post.approved`), and an empty `data.targets`. `ad.status_changed` fires when an ad campaign changes status (for example `pending_review` to `active` or `rejected`); its `data` is the campaign, not a post: `campaign_id`, `workspace_id`, `name`, `platform`, `campaign_type`, `status`, `previous_status`, `external_campaign_id` and `budget`.
+Events: `post.scheduled`, `post.published`, `post.failed`, `post.approved` (the last step of a post's approval workflow is approved) and `post.rejected` (an approver rejects the post; it will not publish). The two approval events carry `data.approval` with `status`, `decided_by` (the approver's user id) and `reason` (null on `post.approved`), and an empty `data.targets`. `ad.status_changed` fires when an ad campaign changes status (for example `pending_review` to `active` or `rejected`); its `data` is the campaign, not a post: `campaign_id`, `workspace_id`, `name`, `platform`, `campaign_type`, `status`, `previous_status`, `external_campaign_id` and `budget`. More ad events: `ad.created`, `ad.updated`, `ad.review`, `ad.delivery_issue`, `campaign.created`, `campaign.updated`, `campaign.budget` (these carry the campaign plus `details`), `lead.received`, `ads.sync_failed`, `ads.sync_recovered`, `ads.initial_sync_completed` and `ad_rule.triggered`. Subscribing to `ad.status_changed` or any other Ads event (`ad.*`, `campaign.*`, `lead.*`, `ads.*`, `ad_rule.*`) needs the `ads:read` scope on the key and `access_ads` for its person (`403 insufficient_scope` / `insufficient_permission`).
 
 ### Manage endpoints
 
@@ -828,9 +888,11 @@ System.out.println(created.get("data").get("secret").asText()); // save it, only
 client.webhooks().list();
 client.webhooks().get(webhookId);
 client.webhooks().update(webhookId, Params.of("is_active", false));
-JsonNode rotated = client.webhooks().rotateSecret(webhookId); // old secret stops working
+JsonNode rotated = client.webhooks().rotateSecret(webhookId); // the old secret keeps signing for 24 hours
 client.webhooks().delete(webhookId);
 ```
+
+Every webhook carries `workspace_id`. `list` and `get` also return the organisation-wide webhooks of the key's organisation (`workspace_id` null, made in the OmniSocials dashboard; they receive the events of every workspace), and `update`, `delete` and `rotateSecret` work on them too. Webhooks you create through the API belong to the key's workspace. When the person behind a webhook loses access to the organisation or workspace, OmniSocials switches the webhook off: `is_active` is false and `last_failure.error` says why. `update(id, Params.of("is_active", true))` switches it on again.
 
 ### Verify deliveries (Spring Boot example)
 
@@ -882,6 +944,26 @@ public class OmniSocialsWebhookController {
 ```
 
 `Webhooks.verifySignature` uses a constant-time comparison (`MessageDigest.isEqual`), rejects timestamps older than the tolerance in seconds (replay protection, default 300), throws `WebhookVerificationException` on any failure, and returns the parsed event on success.
+
+### Rotate the secret without missing deliveries
+
+For 24 hours after `rotateSecret`, every delivery carries two headers: `X-OmniSocials-Signature`, signed with the new secret, and `X-OmniSocials-Signature-Previous`, signed with the old secret (same format, same timestamp and body). Verify the first with the new secret and, when that fails, the second with the old one:
+
+```java
+JsonNode verifyDelivery(String rawBody, String signature, String previousSignature) {
+  try {
+    return Webhooks.verifySignature(rawBody, signature, System.getenv("OMNISOCIALS_WEBHOOK_SECRET")); // the new secret
+  } catch (WebhookVerificationException e) {
+    if (previousSignature == null || previousSignature.isEmpty()) {
+      throw e;
+    }
+    // previousSignature = the X-OmniSocials-Signature-Previous header
+    return Webhooks.verifySignature(rawBody, previousSignature, System.getenv("OMNISOCIALS_WEBHOOK_SECRET_OLD")); // the old secret
+  }
+}
+```
+
+Rotating again within the 24 hours replaces the previous secret with the one you just rotated out.
 
 ## Limits and feature requests
 
@@ -960,7 +1042,7 @@ try {
 
 ## API scopes
 
-Each API key carries scopes: `posts:read`, `posts:write`, `media:write`, `accounts:read`, `analytics:read`, `webhooks:manage`, plus the opt-in `automations:read` / `automations:write` for comment-to-DM automations and `ads:read` / `ads:write` for ads. A call with a missing scope throws `PermissionDeniedException` with code `insufficient_scope`.
+Each API key carries scopes: `posts:read`, `posts:write`, `media:write`, `accounts:read`, `analytics:read`, `webhooks:manage`, plus the opt-in `automations:read` / `automations:write` for comment-to-DM automations `ads:read` / `ads:write` for ads, and `ads:spend` (the **Start ads** switch) to start ads and raise their spend. A call with a missing scope throws `PermissionDeniedException` with code `insufficient_scope`.
 
 ## Documentation
 

@@ -46,6 +46,22 @@ class WebhooksTest {
   }
 
   @Test
+  void previousHeaderVerifiesWithTheOldSecret() throws Exception {
+    // For 24 hours after a secret rotation a delivery also carries
+    // X-OmniSocials-Signature-Previous: the same scheme, signed with the OLD
+    // secret. The new secret fails on it; the old secret verifies it.
+    String oldSecret = "whsec_test_old_secret";
+    long ts = System.currentTimeMillis() / 1000L;
+    String previous = sign(oldSecret, ts, BODY);
+
+    assertThrows(
+        WebhookVerificationException.class,
+        () -> Webhooks.verifySignature(BODY, previous, SECRET, 300));
+    JsonNode event = Webhooks.verifySignature(BODY, previous, oldSecret, 300);
+    assertEquals("evt_123", event.get("id").asText());
+  }
+
+  @Test
   void rejectedEventKeepsItsApprovalObject() throws Exception {
     String body =
         "{\"id\":\"evt_456\",\"type\":\"post.rejected\","

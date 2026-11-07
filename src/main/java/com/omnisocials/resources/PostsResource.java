@@ -215,6 +215,12 @@ public final class PostsResource extends ApiResource {
    * platform; see {@link TagsResource}. The post carries {@code tags} (the
    * tag objects) and {@code trial_reel} ({@code { strategy }} for an
    * Instagram Trial Reel, else {@code null}).
+   *
+   * <p>A media id that is still processing (a large video is checked and
+   * converted after upload) answers {@code 409 media_processing} and nothing
+   * is created: wait until {@code media().get(id)} says {@code ready}, then
+   * send the same request again. A file whose processing failed answers
+   * {@code 400 invalid_media}: upload it again.
    */
   public JsonNode create(Map<String, Object> params) {
     return client.post("/posts/create", params);
@@ -223,8 +229,9 @@ public final class PostsResource extends ApiResource {
   /**
    * {@code POST /posts/create-and-publish} - create a post and publish it immediately.
    * See {@link #create(Map)} for the {@code warnings} array (X link posts,
-   * and the {@code image_fit} entries steered by {@code media_fit}) and the
-   * X link-post credit gate (402 {@code x_credits_insufficient}).
+   * and the {@code image_fit} entries steered by {@code media_fit}), the
+   * X link-post credit gate (402 {@code x_credits_insufficient}) and the
+   * {@code 409 media_processing} / {@code 400 invalid_media} answers.
    */
   public JsonNode createAndPublish(Map<String, Object> params) {
     return client.post("/posts/create-and-publish", params);
@@ -280,12 +287,29 @@ public final class PostsResource extends ApiResource {
    * only {@code tags} works on every post, published ones included. To
    * change a few tags on many posts at once, use
    * {@link TagsResource#apply(Map)}.
+   *
+   * <p>409 answers, where nothing is changed: {@code post_publishing} while
+   * the post is publishing (status {@code posting}) or a retry publishes one
+   * of its channels (poll {@code get(id)} until {@code published},
+   * {@code warning} or {@code failed}; an update with only {@code tags}
+   * still works); {@code review_required} when changes were requested on
+   * the post ({@code approval_status} {@code rejected}) and the update
+   * would schedule it (it needs a new review: create it again with
+   * {@code approval_workflow_id}; saving it as a draft works);
+   * {@code media_processing} as on {@link #create(Map)}.
    */
   public JsonNode update(String id, Map<String, Object> params) {
     return client.patch("/posts/" + seg(id), params);
   }
 
-  /** {@code DELETE /posts/:id} - remove a post from OmniSocials (the live post stays on the platform). Returns {@code null} (204). */
+  /**
+   * {@code DELETE /posts/:id} - remove a post from OmniSocials (the live
+   * post stays on the platform). Returns {@code null} (204). While the post
+   * is publishing (status {@code posting}) or a retry publishes one of its
+   * channels, the answer is {@code 409 post_publishing} and nothing is
+   * deleted: poll {@code get(id)} until {@code published}, {@code warning}
+   * or {@code failed}, then delete it.
+   */
   public JsonNode delete(String id) {
     return client.delete("/posts/" + seg(id));
   }
@@ -294,7 +318,11 @@ public final class PostsResource extends ApiResource {
    * {@code POST /posts/:id/publish} - publish a draft or scheduled post now.
    *
    * <p>See {@link #create(Map)} for the X link-post credit gate (402
-   * {@code x_credits_insufficient}), which also applies here.
+   * {@code x_credits_insufficient}), which also applies here. A post on
+   * which changes were requested in its approval workflow
+   * ({@code approval_status} {@code rejected}) answers
+   * {@code 409 review_required}: it publishes only after a new review
+   * (create it again with {@code approval_workflow_id}).
    */
   public JsonNode publish(String id) {
     return client.post("/posts/" + seg(id) + "/publish");
@@ -306,7 +334,10 @@ public final class PostsResource extends ApiResource {
    * post. Only the platforms that failed are re-published; platforms that
    * already succeeded are never posted again. Asynchronous: a 200 means the
    * retry is queued - poll {@code get(id)} for the outcome. Max 3 retries per
-   * platform.
+   * platform. While another retry runs (a second request, the dashboard,
+   * the automatic retry) the answer is {@code 409 retry_in_progress} and
+   * nothing is queued: poll {@code get(id)} and retry once the post is
+   * {@code failed} or {@code warning} again.
    */
   public JsonNode retry(String id) {
     return client.post("/posts/" + seg(id) + "/retry");
@@ -315,37 +346,71 @@ public final class PostsResource extends ApiResource {
   /**
    * {@code POST /posts/:id/approve} - approve the current step of a post's
    * approval workflow, on behalf of the user who owns this API key. That
-   * user must be a listed approver for the workflow's CURRENT step - steps
+   * user must be a listed approver for the workflow's CURRENT step: steps
    * approve in order, so an approver on a later step gets a 403 {@code
    * forbidden} error until earlier steps clear. Only works on a post with
    * {@code approval_status: "pending"}. If this is the last step, the post
    * finalizes immediately ({@code scheduled} or {@code posting});
    * otherwise it stays {@code in_approval} and the next step's approvers
-   * are notified.
+   * are notified. Without a step this approves whatever step is current;
+   * prefer {@link #approve(String, Integer)}.
    */
   public JsonNode approve(String id) {
-    return client.post("/posts/" + seg(id) + "/approve");
+    return approve(id, null);
+  }
+
+  /**
+   * {@code POST /posts/:id/approve} with {@code step_order}: the {@code
+   * current_step} of {@link #getApproval(String)}, the step you reviewed
+   * ({@code null} leaves it out). When the review is on another step now
+   * (somebody decided since you read it, or a retried call already went
+   * through), nothing is approved and the call throws a 409 {@link
+   * com.omnisocials.errors.ApiException} with code {@code step_changed};
+   * {@code getBody().path("error").path("current_step_order")} is the step
+   * the review is on now. Read the approval again before you decide.
+   * Without a step, a retry after a timeout can approve the next step too.
+   */
+  public JsonNode approve(String id, Integer stepOrder) {
+    if (stepOrder == null) {
+      return client.post("/posts/" + seg(id) + "/approve");
+    }
+    return client.post("/posts/" + seg(id) + "/approve", java.util.Map.of("step_order", stepOrder));
   }
 
   /**
    * {@code POST /posts/:id/reject} - reject a post's approval workflow, on
    * behalf of the user who owns this API key. Same approver requirement as
    * {@link #approve(String)}. Unlike approval, a rejection stops the WHOLE
-   * workflow immediately (not just the current step) - the post's status
-   * becomes {@code rejected}. {@code comment} is optional (pass null) and,
-   * when given, is shown to the requester and other approvers in the
-   * post's review thread.
+   * workflow immediately (not just the current step): the post's status
+   * becomes {@code rejected}. {@code comment} is optional (pass null; max
+   * 2000 characters) and, when given, is shown to the requester and other
+   * approvers in the post's review thread.
    */
   public JsonNode reject(String id, String comment) {
-    if (comment == null) {
+    return reject(id, comment, null);
+  }
+
+  /**
+   * {@code POST /posts/:id/reject} with a comment and {@code step_order}
+   * (both optional, pass null). {@code stepOrder} works as on {@link
+   * #approve(String, Integer)}: when the review moved on, nothing is
+   * rejected and the call throws a 409 {@code step_changed} {@link
+   * com.omnisocials.errors.ApiException} with {@code current_step_order} in
+   * its body.
+   */
+  public JsonNode reject(String id, String comment, Integer stepOrder) {
+    java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+    if (comment != null) body.put("comment", comment);
+    if (stepOrder != null) body.put("step_order", stepOrder);
+    if (body.isEmpty()) {
       return client.post("/posts/" + seg(id) + "/reject");
     }
-    return client.post("/posts/" + seg(id) + "/reject", java.util.Map.of("comment", comment));
+    return client.post("/posts/" + seg(id) + "/reject", body);
   }
 
   /** {@code POST /posts/:id/reject} with no comment. See {@link #reject(String, String)}. */
   public JsonNode reject(String id) {
-    return reject(id, null);
+    return reject(id, null, null);
   }
 
   /**

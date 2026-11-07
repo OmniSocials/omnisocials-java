@@ -4,7 +4,27 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.omnisocials.resources.AccountsResource;
+import com.omnisocials.resources.AdAccountsResource;
+import com.omnisocials.resources.AdAudiencesResource;
+import com.omnisocials.resources.AdBudgetSchedulesResource;
+import com.omnisocials.resources.AdCampaignAdsResource;
+import com.omnisocials.resources.AdCommentsResource;
+import com.omnisocials.resources.AdConversionsResource;
 import com.omnisocials.resources.AdDraftsResource;
+import com.omnisocials.resources.AdGoogleResource;
+import com.omnisocials.resources.AdInsightsResource;
+import com.omnisocials.resources.AdLeadFormsResource;
+import com.omnisocials.resources.AdLeadsResource;
+import com.omnisocials.resources.AdMediaResource;
+import com.omnisocials.resources.AdObjectsResource;
+import com.omnisocials.resources.AdPartnershipResource;
+import com.omnisocials.resources.AdPreviewsResource;
+import com.omnisocials.resources.AdReachFrequencyResource;
+import com.omnisocials.resources.AdReportsResource;
+import com.omnisocials.resources.AdResultsResource;
+import com.omnisocials.resources.AdRulesResource;
+import com.omnisocials.resources.AdStudiesResource;
+import com.omnisocials.resources.AdTargetingResource;
 import com.omnisocials.resources.AdsResource;
 import com.omnisocials.resources.AnalyticsResource;
 import com.omnisocials.resources.AutomationsResource;
@@ -105,12 +125,63 @@ class ResourceSurfaceTest {
   void adsSurface() {
     assertHasMethods(
         AdsResource.class,
-        "drafts", "listAccounts", "capabilities", "list", "get", "boost", "boostMulti", "create",
+        "drafts", "listAccounts", "capabilities", "list", "get", "boost", "boostMulti",
         "update", "activate", "activateMulti", "pause", "resume", "delete", "overview",
         "suggestions", "researchKeywords", "keywordMetrics");
+    // POST /ads/campaigns was removed: a new ad is ads().drafts().create().
+    assertTrue(
+        Arrays.stream(AdsResource.class.getDeclaredMethods())
+            .noneMatch(m -> m.getName().equals("create")),
+        "AdsResource still has create");
     assertHasMethods(
         AdDraftsResource.class,
         "defaults", "create", "get", "update", "delete", "attachAccount", "launch");
+  }
+
+  @Test
+  void adsParitySurface() {
+    assertHasMethods(
+        AdsResource.class,
+        "objects", "campaignAds", "comments", "targeting", "audiences", "leadForms", "leads",
+        "conversions", "insights", "reports", "rules", "results", "media", "previews",
+        "partnership", "accounts", "reachFrequency", "studies", "budgetSchedules", "google",
+        "bulkStatus", "duplicate");
+    assertHasMethods(AdCampaignAdsResource.class, "list", "add", "get", "setStatus", "review");
+    assertHasMethods(
+        AdObjectsResource.class,
+        "tree", "get", "update", "setStatus", "duplicate", "importStatus", "startImport",
+        "listExternal", "getExternal");
+    assertHasMethods(AdTargetingResource.class, "search", "browse", "reachEstimate", "bidSuggestions");
+    assertHasMethods(
+        AdAudiencesResource.class,
+        "list", "create", "get", "update", "delete", "addMembers", "removeMembers", "addCompanies");
+    assertHasMethods(
+        AdLeadFormsResource.class, "list", "create", "get", "update", "delete", "sendTestLead");
+    assertHasMethods(AdLeadsResource.class, "list", "counts", "update");
+    assertHasMethods(AdConversionsResource.class, "destinations", "goals", "createCustom", "sendEvents");
+    assertHasMethods(
+        AdInsightsResource.class, "query", "campaign", "ad", "timeline", "performance", "alerts");
+    assertHasMethods(AdReportsResource.class, "list", "start", "get");
+    assertHasMethods(
+        AdRulesResource.class,
+        "list", "create", "templates", "preview", "activity", "undo", "get", "update", "delete",
+        "previewSaved", "runs");
+    assertHasMethods(AdResultsResource.class, "list", "upload", "totals", "metrics", "putMetric");
+    assertHasMethods(AdMediaResource.class, "list", "upload", "get", "delete");
+    assertHasMethods(AdPreviewsResource.class, "create", "forAd");
+    assertHasMethods(AdPartnershipResource.class, "listContent", "listPermissions", "setPermission");
+    assertHasMethods(AdCommentsResource.class, "list", "reply", "hide", "delete");
+    assertHasMethods(
+        AdAccountsResource.class,
+        "health", "finance", "updateSettings", "listUsers", "addUser", "removeUser", "activity",
+        "businesses", "dsa", "hierarchy", "identities");
+    assertHasMethods(AdReachFrequencyResource.class, "create", "get", "cancel", "reserve");
+    assertHasMethods(AdStudiesResource.class, "list", "create");
+    assertHasMethods(AdBudgetSchedulesResource.class, "list", "create", "delete");
+    assertHasMethods(
+        AdGoogleResource.class,
+        "searchTerms", "recommendations", "keywords", "assets", "sharedBudgets", "bidStrategies",
+        "adSchedule", "labels", "localServicesLeads");
   }
 
   @Test
