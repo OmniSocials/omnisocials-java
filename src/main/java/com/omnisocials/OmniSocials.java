@@ -13,6 +13,7 @@ import com.omnisocials.resources.AdsResource;
 import com.omnisocials.resources.AnalyticsResource;
 import com.omnisocials.resources.ApprovalWorkflowsResource;
 import com.omnisocials.resources.AudioResource;
+import com.omnisocials.resources.CreditsResource;
 import com.omnisocials.resources.AutomationsResource;
 import com.omnisocials.resources.FeatureRequestsResource;
 import com.omnisocials.resources.FoldersResource;
@@ -72,7 +73,7 @@ import java.util.stream.Collectors;
 public final class OmniSocials {
 
   /** SDK version, also used in the User-Agent header. */
-  public static final String VERSION = "0.17.0";
+  public static final String VERSION = "0.18.0";
 
   public static final String DEFAULT_BASE_URL = "https://api.omnisocials.com/v1";
   public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
@@ -96,6 +97,7 @@ public final class OmniSocials {
   private final ApprovalWorkflowsResource approvalWorkflows;
   private final AccountsResource accounts;
   private final AnalyticsResource analytics;
+  private final CreditsResource credits;
   private final AudioResource audio;
   private final LocationsResource locations;
   private final PinterestResource pinterest;
@@ -125,6 +127,7 @@ public final class OmniSocials {
     this.approvalWorkflows = new ApprovalWorkflowsResource(this);
     this.accounts = new AccountsResource(this);
     this.analytics = new AnalyticsResource(this);
+    this.credits = new CreditsResource(this);
     this.audio = new AudioResource(this);
     this.locations = new LocationsResource(this);
     this.pinterest = new PinterestResource(this);
@@ -178,6 +181,11 @@ public final class OmniSocials {
 
   public AnalyticsResource analytics() {
     return analytics;
+  }
+
+  /** The organisation's credit balance and what X statistics cost (scope {@code credits:read}). */
+  public CreditsResource credits() {
+    return credits;
   }
 
   public AudioResource audio() {

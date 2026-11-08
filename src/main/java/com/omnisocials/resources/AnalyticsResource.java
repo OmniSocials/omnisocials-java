@@ -2,6 +2,7 @@ package com.omnisocials.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.omnisocials.OmniSocials;
+import com.omnisocials.RetryPolicy;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +16,30 @@ public final class AnalyticsResource extends ApiResource {
   /** {@code GET /analytics/posts/:id} - latest per-platform metrics for one post. */
   public JsonNode post(String postId) {
     return client.get("/analytics/posts/" + seg(postId));
+  }
+
+  /**
+   * {@code POST /analytics/posts/:id/refresh} - "Update now": read the X
+   * numbers of one published post now, outside its check schedule. X bills
+   * every read, so it costs half a credit per tweet (each part of a thread
+   * counts, plus half a credit for a video or GIF), and nothing when the post
+   * was already read today (UTC). OmniSocials Connect accounts pay on the
+   * partner's own X app. At most 5 reads of a post a UTC day. Needs
+   * {@code analytics:read}. Returns {@code { data: { post_id, tweets: [{ id,
+   * metrics, read_at }], credits_used, read_at } }}. Because it can cost
+   * credits it is retried only after a 429 ({@link RetryPolicy#RATE_LIMIT_ONLY}),
+   * never after a 5xx, a timeout or a lost connection. Errors: 402
+   * {@code insufficient_credits}, 404 {@code not_found}, 409
+   * {@code refresh_not_available} (no published X tweet), 429
+   * {@code refresh_limit}, 502 {@code refresh_failed} (nothing charged).
+   */
+  public JsonNode refreshPost(String postId) {
+    return client.post("/analytics/posts/" + seg(postId) + "/refresh", RetryPolicy.RATE_LIMIT_ONLY);
+  }
+
+  /** {@link #refreshPost(String)} with a numeric post id. */
+  public JsonNode refreshPost(long postId) {
+    return refreshPost(Long.toString(postId));
   }
 
   /**

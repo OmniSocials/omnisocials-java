@@ -28,6 +28,7 @@ import com.omnisocials.resources.AdTargetingResource;
 import com.omnisocials.resources.AdsResource;
 import com.omnisocials.resources.AnalyticsResource;
 import com.omnisocials.resources.AutomationsResource;
+import com.omnisocials.resources.CreditsResource;
 import com.omnisocials.resources.FeatureRequestsResource;
 import com.omnisocials.resources.FoldersResource;
 import com.omnisocials.resources.HashtagSetsResource;
@@ -96,13 +97,19 @@ class ResourceSurfaceTest {
 
   @Test
   void accountsSurface() {
-    assertHasMethods(AccountsResource.class, "list", "get");
+    assertHasMethods(AccountsResource.class, "list", "get", "update", "updateXStatistics");
   }
 
   @Test
   void analyticsSurface() {
     assertHasMethods(
-        AnalyticsResource.class, "post", "posts", "overview", "accounts", "bestTimes", "tags");
+        AnalyticsResource.class,
+        "post", "posts", "refreshPost", "overview", "accounts", "bestTimes", "tags");
+  }
+
+  @Test
+  void creditsSurface() {
+    assertHasMethods(CreditsResource.class, "get");
   }
 
   @Test
@@ -218,6 +225,7 @@ class ResourceSurfaceTest {
     assertNotNull(client.tags());
     assertNotNull(client.accounts());
     assertNotNull(client.analytics());
+    assertNotNull(client.credits());
     assertNotNull(client.locations());
     assertNotNull(client.pinterest());
     assertNotNull(client.automations());

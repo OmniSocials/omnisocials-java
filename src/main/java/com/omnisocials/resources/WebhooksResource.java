@@ -43,7 +43,11 @@ public final class WebhooksResource extends ApiResource {
    * and for ads ad.status_changed, ad.created, ad.updated, ad.review,
    * ad.delivery_issue, campaign.created, campaign.updated, campaign.budget,
    * lead.received, ads.sync_failed, ads.sync_recovered,
-   * ads.initial_sync_completed, ad_rule.triggered). Params: {@code url},
+   * ads.initial_sync_completed, ad_rule.triggered, and for X statistics
+   * x_statistics.paused and x_statistics.resumed: the organisation's X
+   * statistics stopped at 0 credits or started again after a top-up, one
+   * delivery per workspace with X, data {@code { workspace_id, account_id,
+   * reason }} with reason insufficient_credits or credits_added). Params: {@code url},
    * {@code events}. The {@code data} of an {@code ad.status_changed} delivery
    * is the campaign, not a post: {@code campaign_id}, {@code workspace_id},
    * {@code name}, {@code platform}, {@code campaign_type}, {@code status},
