@@ -65,6 +65,13 @@ public final class WebhooksResource extends ApiResource {
    * {@code is_active: true} switches on a webhook that was switched off
    * (also an automatic switch-off); setting {@code url}, {@code events} or
    * switching it on makes the key's creator the person behind the webhook.
+   * Setting {@code url} on an organisation-wide webhook (even its current
+   * one) moves it to the key's workspace: from then on it gets only that
+   * workspace's events, and the answer shows the new {@code workspace_id}.
+   * When the webhook has Ads events after the change, setting {@code url} or
+   * {@code events} or switching it on needs the {@code ads:read} scope and
+   * {@code access_ads} for the key's creator (403 otherwise, nothing
+   * changed).
    */
   public JsonNode update(String id, Map<String, Object> params) {
     return client.patch("/webhooks/" + seg(id), params);

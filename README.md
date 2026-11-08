@@ -17,14 +17,14 @@ Maven:
 <dependency>
   <groupId>com.omnisocials</groupId>
   <artifactId>omnisocials-java</artifactId>
-  <version>0.16.0</version>
+  <version>0.17.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation "com.omnisocials:omnisocials-java:0.16.0"
+implementation "com.omnisocials:omnisocials-java:0.17.0"
 ```
 
 ## Quickstart

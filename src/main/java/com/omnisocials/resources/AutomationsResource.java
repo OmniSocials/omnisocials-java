@@ -166,8 +166,9 @@ public final class AutomationsResource extends ApiResource {
    * Follow first, asked to follow, the link goes out after the follow),
    * {@code reason} / {@code reason_label} (X adds the skip reasons
    * {@code dms_closed}, {@code no_credits}, {@code opted_out} and
-   * {@code automation_off}; Follow first adds {@code already_waiting}),
-   * {@code person} ({@code id}, {@code username}; on
+   * {@code automation_off}; Follow first adds {@code already_waiting};
+   * {@code plan_inactive} = the organisation had no active plan or trial,
+   * so nothing was sent), {@code person} ({@code id}, {@code username}; on
    * Facebook the person's name, since Facebook has no @handle),
    * {@code trigger_id}, {@code trigger_text}, {@code message} (the DM sent),
    * {@code public_reply}, {@code platform_message_id}, {@code follow_gate}

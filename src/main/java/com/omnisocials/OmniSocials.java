@@ -72,7 +72,7 @@ import java.util.stream.Collectors;
 public final class OmniSocials {
 
   /** SDK version, also used in the User-Agent header. */
-  public static final String VERSION = "0.16.0";
+  public static final String VERSION = "0.17.0";
 
   public static final String DEFAULT_BASE_URL = "https://api.omnisocials.com/v1";
   public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
@@ -394,7 +394,20 @@ public final class OmniSocials {
   // ─── Internals ─────────────────────────────────────────────────────────────
 
   private URI buildUri(String path, Map<String, Object> query) {
-    String url = baseUrl + (path.startsWith("/") ? path : "/" + path);
+    String fullPath = path.startsWith("/") ? path : "/" + path;
+    // Every id in the path was encoded with ApiResource.seg, which leaves "."
+    // and ".." as they are: URL normalisation drops such a segment or climbs
+    // one level, so an id of ".." would reach another endpoint of the same API
+    // key, and an empty id the list route. Refused before anything is sent.
+    String[] segments = fullPath.split("\\?", 2)[0].split("/", -1);
+    for (int i = 1; i < segments.length; i++) {
+      String segment = segments[i];
+      if (segment.isEmpty() || segment.equals(".") || segment.equals("..")) {
+        throw new IllegalArgumentException(
+            "Invalid request path \"" + fullPath + "\": an id cannot be empty, \".\" or \"..\".");
+      }
+    }
+    String url = baseUrl + fullPath;
     if (query != null && !query.isEmpty()) {
       StringBuilder qs = new StringBuilder();
       for (Map.Entry<String, Object> entry : query.entrySet()) {
